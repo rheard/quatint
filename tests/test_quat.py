@@ -35,7 +35,7 @@ class HurwitzIntTests:
     def assert_equal(res: Union[tuple, list, HurwitzQuaternion], res_int: hurwitzint):
         """Validate the hurwitzint is equal to the validation object, and that it is still backed by integers"""
         if isinstance(res, HurwitzQuaternion):
-            res = [x*2 for x in res]
+            res = [x * 2 for x in res]
 
         assert list(res) == list(res_int)
 
@@ -72,28 +72,28 @@ class TestAdd(HurwitzIntTests):
         for i in range(100):
             res_int = self.a_int + i
 
-            self.assert_equal((2 + i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 + i * 2, 4, 6, 8), res_int)
 
     def test_add_int_reversed(self):
         """Test int + hurwitzint"""
         for i in range(100):
             res_int = i + self.a_int
 
-            self.assert_equal((2 + i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 + i * 2, 4, 6, 8), res_int)
 
     def test_add_float(self):
         """Test hurwitzint + float"""
         for i in range(100):
             res_int = self.a_int + float(i)
 
-            self.assert_equal((2 + i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 + i * 2, 4, 6, 8), res_int)
 
     def test_add_float_reversed(self):
         """Test float + hurwitzint"""
         for i in range(100):
             res_int = float(i) + self.a_int
 
-            self.assert_equal((2 + i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 + i * 2, 4, 6, 8), res_int)
 
 
 class TestSub(HurwitzIntTests):
@@ -111,28 +111,28 @@ class TestSub(HurwitzIntTests):
         for i in range(100):
             res_int = self.a_int - i
 
-            self.assert_equal((2 - i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 - i * 2, 4, 6, 8), res_int)
 
     def test_sub_int_reversed(self):
         """Test int - hurwitzint"""
         for i in range(100):
             res_int = i - self.a_int
 
-            self.assert_equal((i*2 - 2, -4, -6, -8), res_int)
+            self.assert_equal((i * 2 - 2, -4, -6, -8), res_int)
 
     def test_sub_float(self):
         """Test hurwitzint - float"""
         for i in range(100):
             res_int = self.a_int - float(i)
 
-            self.assert_equal((2 - i*2, 4, 6, 8), res_int)
+            self.assert_equal((2 - i * 2, 4, 6, 8), res_int)
 
     def test_sub_float_reversed(self):
         """Test float - hurwitzint"""
         for i in range(100):
             res_int = float(i) - self.a_int
 
-            self.assert_equal((i*2 - 2, -4, -6, -8), res_int)
+            self.assert_equal((i * 2 - 2, -4, -6, -8), res_int)
 
 
 class TestNegPos(HurwitzIntTests):
@@ -171,7 +171,6 @@ class TestMul(HurwitzIntTests):
     def test_mul_int(self):
         """Test hurwitzint * int"""
         for i in range(100):
-            print(i)
             res_int = self.a_int * i
 
             self.assert_equal((2 * i, 4 * i, 6 * i, 8 * i), res_int)

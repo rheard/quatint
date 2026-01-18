@@ -1,7 +1,4 @@
-from dataclasses import dataclass
-from math import gcd, isqrt
-from typing import Iterator, Union, Tuple, Optional, List, Dict
-
+from typing import Iterator, List, Optional, Tuple, Union
 
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
@@ -57,14 +54,20 @@ class hurwitzint:
         Initialize a hurwitzint.
 
         Args:
-            a,b,c,d:
+            a:
                 If half=False (default): interpreted as integer components (Lipschitz):
                     q = a + b*i + c*j + d*k
                 If half=True: interpreted as numerator components for /2:
                     q = (a + b*i + c*j + d*k) / 2
                 (So (1+i+j+k)/2 is hurwitzint(1,1,1,1, half=True).)
+            b: See a.
+            c: See a.
+            d: See a.
             half:
                 Whether inputs are already in numerator-units for /2 representation.
+
+        Raises:
+            ValueError: If parity is incorrect.
         """
         a0, b0, c0, d0 = int(a), int(b), int(c), int(d)
 
@@ -106,13 +109,14 @@ class hurwitzint:
 
     @property
     def den(self) -> int:
+        """Static determinant, because everything is doubled under the hood anyway"""
         return 2
 
     def conjugate(self) -> "hurwitzint":
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
         return self._make(self.a, -self.b, -self.c, -self.d)
 
-    def components2(self) -> tuple[int, int, int, int]:
+    def components2(self) -> Tuple[int, int, int, int]:
         """Return the stored numerator components (A,B,C,D) for (...)/2."""
         return (self.a, self.b, self.c, self.d)
 
@@ -193,7 +197,8 @@ class hurwitzint:
         return result
 
     # region Euclidean division (Hurwitz order is norm-Euclidean)
-    def _division(self, num: "hurwitzint", divisor: "hurwitzint", divisor_norm: int):
+    def _division(self, num: "hurwitzint", divisor: "hurwitzint", divisor_norm: int) \
+            -> Tuple["hurwitzint", "hurwitzint"]:
         """
         A shared division algorithm.
 
@@ -201,6 +206,9 @@ class hurwitzint:
             num: The number to divide.
             divisor: The divisor.
             divisor_norm: The divisor norm. Should be checked for 0 already!
+
+        Returns:
+            tuple: The quotient and remainder.
         """
 
         # We want q ≈ num / n, but everything is stored in numerator-units (../2).
@@ -308,12 +316,15 @@ class hurwitzint:
     # endregion
 
     # region Right-division helpers
-    def rdivmod(self, other: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
+    def rdivmod(self, other: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
         """
         Right-quotient division in the Hurwitz quaternion order.
 
         Defines quotient on the RIGHT:
             self = other * q + r
+
+        Raises:
+            ZeroDivisionError: If trying to divide by 0.
 
         Returns:
             (q, r)
@@ -334,14 +345,16 @@ class hurwitzint:
         return self._division(num, other, n)
 
     def rtruediv(self, other: OP_TYPES) -> "hurwitzint":
-        # right-quotient variant of "/"
+        """A version of __truediv__ for right-division"""
         return self.rfloordiv(other)
 
     def rfloordiv(self, other: OP_TYPES) -> "hurwitzint":
+        """A version of __floordiv__ for right-division"""
         q, _ = self.rdivmod(other)
         return q
 
     def rmod(self, other: OP_TYPES) -> "hurwitzint":
+        """A version of __mod__ for right-division"""
         _, r = self.rdivmod(other)
         return r
     # endregion
@@ -351,12 +364,20 @@ class hurwitzint:
         """
         Reduced norm:
             N((A+Bi+Cj+Dk)/2) = (A^2+B^2+C^2+D^2)/4
+
         Always an integer for valid Hurwitz integers.
+
+        Raises:
+            ArithmeticError: If there is a non-integral norm due to parity violation.
+
+        Returns:
+            int: The norm.
         """
         num = self.a * self.a + self.b * self.b + self.c * self.c + self.d * self.d
         q, r = divmod(num, 4)
         if r != 0:
             raise ArithmeticError("Non-integral norm; parity constraint violated")
+
         return q
 
     def __bool__(self) -> bool:
@@ -398,7 +419,7 @@ class hurwitzint:
             ra, rb, rc, rd = self.a, self.b, self.c, self.d
             den = 2
 
-        terms: list[tuple[int, str]] = [(ra, ""), (rb, "i"), (rc, "j"), (rd, "k")]
+        terms: List[Tuple[int, str]] = [(ra, ""), (rb, "i"), (rc, "j"), (rd, "k")]
 
         out = ""
         first = True
@@ -417,19 +438,19 @@ class hurwitzint:
             else:
                 out += sign
 
-            if sym == "":
-                out += str(mag)
-            else:
+            if sym:
                 if mag == 1:
                     out += sym
                 else:
                     out += f"{mag}{sym}"
+            else:
+                out += str(mag)
 
         if den:
             return f"({out})/{den}"
         return out
 
 
-def rdivmod(a, b):
+def rdivmod(a: "hurwitzint", b: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
     """Simply a helper method to match existing Python divmod syntax"""
     return a.rdivmod(b)

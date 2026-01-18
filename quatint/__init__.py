@@ -1,1 +1,1 @@
-from quatint.quat import hurwitzint
+from quatint.quat import hurwitzint as hurwitzint
