@@ -927,6 +927,6 @@ def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
     return a.gcd_right(b)
 
 
-def prod_left(x, start=1):
+def prod_left(x: Iterator[object], start: object = 1):
     """Simply a helper method to match existing Python prod syntax"""
-    return functools.reduce(operator.mul, x, 1) * start  # noqa: E731
+    return functools.reduce(operator.mul, x, 1) * start
