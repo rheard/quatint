@@ -9,7 +9,9 @@ _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
 
 
-@dataclass(frozen=True, slots=True)
+# TODO: Once Py3.9 support has been dropped, add slots=True
+# @dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class HurwitzFactorization:
     """
     Canonical-ish normal form (deterministic):
