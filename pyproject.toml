@@ -1,0 +1,133 @@
+[build-system]
+requires = [
+    "mypy[mypyc]",
+    "setuptools",
+]
+
+[project]
+name = "quatint"
+version = "0.0.1"
+dynamic = ["license"]
+authors = [
+  { name="Ryan Heard", email="ryanwheard@gmail.com" },
+]
+description = "A quatint class, for using quaternions backed by integers and half-integers (Hurwitz integers)."
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+keywords = ["complex", "math"]
+
+[project.urls]
+Repository = "https://github.com/rheard/quatint"
+
+[tool.cibuildwheel]
+build = "cp3{8,9,10,11,12,13}-{win,macosx,manylinux}*"
+
+before-test = [
+    'mkdir "{project}/temp"',
+    'mv "{project}/quatint" "{project}/temp/quatint"',  # Move the .py files away so they are not used in testing
+]
+test-requires=["ruff", "pylint", "pytest", "hurwitz"]
+test-command=[
+    "python -m pytest {project}/tests",
+    "ruff check {project}",
+
+    # Require docstrings on all unit tests!
+    'python -m pylint {project}/tests --disable=all --enable=C0115,C0116 --no-docstring-rgx="^(?!(test_|Test)).*"',
+    'mv "{project}/temp/quatint" "{project}/quatint"',  # Move the .py files back so they are ready for the next build
+    'rm -rf "{project}/temp"',
+]
+
+[tool.ruff]
+line-length = 120
+extend-exclude=["quatint-stubs"]
+
+[tool.ruff.lint]
+preview = true
+extend-select = [
+    "A",      # flake8-builtins
+    "ANN",    # flake8-annotations
+    "ARG",    # flake8-unused-arguments
+    "B",      # flake8-bugbear
+    "BLE",    # flake8-blind-except
+    "C4",     # flake8-comprehensions
+    "COM",    # flake8-commas
+    "DOC",    # lint.pydoclint
+    "D",      # lint.pydocstyle
+    "D213",   # Require multi-line docstring summary should start on second line, which is not Google convention
+    "E", "W", # pycodestyle
+    # "ERA",    # eradicate    TODO: I'd like to enable this. Problem is, see the wishful thinking tests in test_basic
+    "F",      # Pyflakes
+    "FBT",    # flake8-boolean-trap
+    "FLY",    # flynt
+    "FURB",   # refurb
+    "G",      # flake8-logging-format
+    "I",      # isort
+    "ICN",    # flake8-import-conventions
+    "ISC",    # flake8-implicit-str-concat
+    "LOG",    # flake8-logging
+    "NPY",    # Numpy-specific rules
+    "PD",     # pandas-vet
+    "PERF",   # Perflint
+    "PIE",    # flake8-pie
+    "PLC",    # Pylint
+    "PT",     # flake8-pytest-style
+    "PTH",    # flake8-use-pathlib
+    "PYI",    # flake8-pyi
+    "RET",    # flake8-return
+    "RSE",    # flake8-raise
+    "RUF",    # Ruff-specific rules
+    "SIM",    # flake8-simplify
+    "SLOT",   # flake8-slots
+    "T20",    # flake8-print
+    "TC",     # flake8-type-checking
+    "TRY",    # tryceratops
+    "UP",     # pyupgrade
+    "YTT",    # flake8-2020
+]
+ignore=[
+    "ANN201",  # Missing return type
+    "D100",    # Missing docstring in public module
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "D202",    # Blank line after function docstring
+    "D212",    # Multi-line docstring summary should start at the first line
+    "D415",    # Closing punctuation on docstrings
+    "PT013",   # Incorrect import of pytest
+    "RUF023",  # __slots__ is not sorted
+    "RUF067",  # `__init__` module should only contain docstrings and re-exports
+    "TRY003",  # Avoid specifying long messages outside the exception class
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pydoclint]
+ignore-one-line-docstrings = true
+
+[tool.ruff.lint.flake8-annotations]
+suppress-dummy-args = true
+suppress-none-returning = true
+
+[tool.ruff.lint.flake8-import-conventions.aliases]
+"matplotlib.pyplot" = "plt"
+numpy = "np"
+pandas = "pd"
+subprocess = "sp"
+datetime = "dt"
+
+[tool.ruff.lint.isort]
+force-wrap-aliases = true
+combine-as-imports = true
+lines-after-imports = 1
+lines-between-types = 1
+known-first-party = ["quatint"]
