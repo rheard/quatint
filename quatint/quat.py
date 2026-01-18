@@ -1,4 +1,4 @@
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterator, List, Optional, Tuple, Union
 
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
@@ -197,7 +197,12 @@ class hurwitzint:
         return result
 
     # region Euclidean division (Hurwitz order is norm-Euclidean)
-    def _division(self, num: "hurwitzint", divisor: "hurwitzint", divisor_norm: int) \
+    def _division(
+            self,
+            num: "hurwitzint",
+            divisor: "hurwitzint",
+            divisor_norm: int,
+            remainder: Callable[["hurwitzint", "hurwitzint", "hurwitzint"], "hurwitzint"] = lambda a, b, c: a - b * c) \
             -> Tuple["hurwitzint", "hurwitzint"]:
         """
         A shared division algorithm.
@@ -206,6 +211,7 @@ class hurwitzint:
             num: The number to divide.
             divisor: The divisor.
             divisor_norm: The divisor norm. Should be checked for 0 already!
+            remainder: A callable to compute the remainder.
 
         Returns:
             tuple: The quotient and remainder.
@@ -252,7 +258,7 @@ class hurwitzint:
                             bestA, bestB, bestC, bestD = A, B, C, D
 
         q = self._make(bestA, bestB, bestC, bestD)
-        r = self - q * divisor
+        r = remainder(self, q, divisor)
         return q, r
 
     # region Left-division helpers (non-commutative!)
@@ -342,7 +348,7 @@ class hurwitzint:
         # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other)
         num = other.conjugate() * self
 
-        return self._division(num, other, n)
+        return self._division(num, other, n, lambda a, b, c: a - c * b)
 
     def rtruediv(self, other: OP_TYPES) -> "hurwitzint":
         """A version of __truediv__ for right-division"""
