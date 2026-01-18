@@ -14,7 +14,7 @@ print(a)  # Outputs "3+5i+7j+11k"
 ## Examples
 
 ```python
-from quadint import hurwitzint
+from quatint import hurwitzint
 
 a = hurwitzint(1, 2, 3, 4)
 b = hurwitzint(2, 3, 4, 5)
@@ -32,7 +32,7 @@ Trying to divide using this class, or using floats with this class, will (probab
 
 As an example of this problem, note the equivalences below:
 ```python
-from quadint import hurwitzint
+from quatint import hurwitzint
 
 a = hurwitzint(1, 2, 3, 4)
 
