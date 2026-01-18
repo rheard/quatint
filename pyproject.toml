@@ -2,11 +2,13 @@
 requires = [
     "mypy[mypyc]",
     "setuptools",
+
+    "sympy<=1.12.1",
 ]
 
 [project]
 name = "quatint"
-version = "0.0.2"
+version = "0.0.3"
 dynamic = ["license"]
 authors = [
   { name="Ryan Heard", email="ryanwheard@gmail.com" },
@@ -25,6 +27,11 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
 ]
 keywords = ["complex", "math"]
+dependencies = [
+    # TODO: Sympy began adding mypy type-hints and removed the py.typed file.
+    #   It is actively being worked on, see https://github.com/sympy/sympy/issues/17945
+    "sympy<=1.12.1",
+]
 
 [project.urls]
 Repository = "https://github.com/rheard/quatint"

@@ -1,4 +1,7 @@
-from math import isqrt
+import functools
+import operator
+
+from math import isqrt, prod
 from pathlib import Path
 from typing import Union
 
@@ -33,7 +36,7 @@ class HurwitzIntTests:
         self.b_int = hurwitzint(2, 3, 4, 5)
 
     @staticmethod
-    def assert_equal(res: Union[tuple, list, HurwitzQuaternion], res_int: hurwitzint):
+    def assert_equal(res: Union[tuple, list, HurwitzQuaternion, hurwitzint], res_int: hurwitzint):
         """Validate the hurwitzint is equal to the validation object, and that it is still backed by integers"""
         if isinstance(res, HurwitzQuaternion):
             res = [x * 2 for x in res]
@@ -335,3 +338,28 @@ class TestGcd(HurwitzIntTests):
         # And the gcd should be purely real (imag parts 0)
         assert list(dr)[1:] == [0, 0, 0]
         assert list(dl)[1:] == [0, 0, 0]
+
+
+class TestFactorRight(HurwitzIntTests):
+    """Tests for factor_right"""
+
+    def test_main(self):
+        """Validate factor works as expected."""
+        factors = self.b_int.factor_right()
+
+        ans = prod(reversed(factors.primes), start=factors.unit)
+
+        self.assert_equal(self.b_int, ans)
+
+
+class TestFactorLeft(HurwitzIntTests):
+    """Tests for factor_left"""
+
+    def test_main(self):
+        """Validate factor works as expected."""
+        prod_left = lambda x, start=1: functools.reduce(operator.mul, x, 1) * start  # noqa: E731
+        factors = self.b_int.factor_left()
+
+        ans = prod_left(factors.primes, start=factors.unit)
+
+        self.assert_equal(self.b_int, ans)

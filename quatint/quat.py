@@ -1,8 +1,28 @@
+from dataclasses import dataclass
+from math import gcd
 from typing import Callable, Iterator, List, Optional, Tuple, Union
+
+from sympy import factorint
 
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
+
+
+@dataclass(frozen=True, slots=True)
+class HurwitzFactorization:
+    """
+    Canonical-ish normal form (deterministic):
+
+        x = content * unit * P1 * P2 * ... * Pk
+
+    - content is a positive integer (maximal integer dividing x).
+    - unit is a canonical Hurwitz unit (norm 1).
+    - Pi are Hurwitz primes (norm is a rational prime), each normalized by unit-migration.
+    """
+    content: int
+    unit: "hurwitzint"
+    primes: Tuple["hurwitzint", ...]
 
 
 def _round_div_ties_away_from_zero(a: int, b: int) -> int:
@@ -15,6 +35,55 @@ def _round_div_ties_away_from_zero(a: int, b: int) -> int:
 
     # a < 0
     return -((-a + (b // 2)) // b)
+
+
+def mod_sqrt_prime(n: int, p: int) -> Optional[int]:
+    """Return x such that x*x % p == n % p, or None if no sqrt exists. p must be prime."""
+    n %= p
+    if n == 0:
+        return 0
+
+    if p == 2:
+        return n
+
+    # Legendre symbol test: residue iff n^((p-1)/2) == 1 (mod p)
+    if pow(n, (p - 1) // 2, p) != 1:
+        return None
+
+    # Fast path when p ≡ 3 (mod 4)
+    if p % 4 == 3:
+        return pow(n, (p + 1) // 4, p)
+
+    # Tonelli-Shanks
+    q = p - 1
+    s = 0
+    while q % 2 == 0:
+        s += 1
+        q //= 2
+
+    z = 2
+    while pow(z, (p - 1) // 2, p) != p - 1:
+        z += 1
+
+    m = s
+    c = pow(z, q, p)
+    t = pow(n, q, p)
+    r = pow(n, (q + 1) // 2, p)
+
+    while t != 1:
+        i = 1
+        t2i = (t * t) % p
+        while i < m and t2i != 1:
+            t2i = (t2i * t2i) % p
+            i += 1
+
+        b = pow(c, 1 << (m - i - 1), p)
+        r = (r * b) % p
+        c = (b * b) % p
+        t = (t * c) % p
+        m = i
+
+    return r
 
 
 class hurwitzint:
@@ -542,6 +611,299 @@ class hurwitzint:
             hurwitzint: The gcd.
         """
         return self._gcd(other, divmod_method=rdivmod, normalize=normalize)
+    # endregion
+
+    # region Factoring
+    @staticmethod
+    def units() -> Tuple["hurwitzint", ...]:
+        """All the unit directions from the origin"""
+        # ±1, ±i, ±j, ±k, and (±1±i±j±k)/2 (16 of them).
+        out: List[hurwitzint] = []
+
+        one = hurwitzint(1, 0, 0, 0)
+        i = hurwitzint(0, 1, 0, 0)
+        j = hurwitzint(0, 0, 1, 0)
+        k = hurwitzint(0, 0, 0, 1)
+
+        for s in (-1, 1):
+            out.extend((s * one, s * i, s * j, s * k))
+
+        # 16 half-units
+        out.extend([
+            hurwitzint(a, b, c, d, half=True)
+            for a in (-1, 1)
+            for b in (-1, 1)
+            for c in (-1, 1)
+            for d in (-1, 1)
+        ])
+
+        # Optional: make ordering stable
+        out.sort(key=lambda u: u.components2())
+        return tuple(out)
+
+    def _canonical_left_associate(self) -> Tuple["hurwitzint", "hurwitzint"]:
+        """
+        Unit-migration normalization for a *right* factor:
+            replace p by u*p (u a unit) to get a canonical representative.
+
+        Returns:
+             tuple: (p_canon, u) such that p_canon = u*p.
+        """
+        best = None
+        best_u = None
+        for u in hurwitzint.units():
+            cand = u * self
+            key = cand.components2()
+            if best is None or key < best:
+                best = key
+                best_u = u
+
+        assert best_u is not None
+        return best_u * self, best_u
+
+    def _canonical_right_associate(self) -> Tuple["hurwitzint", "hurwitzint"]:
+        """
+        Unit-migration normalization for a *left* factor:
+            replace p by p*u (u a unit).
+
+        Returns:
+             tuple: (p_canon, u) such that p_canon = p*u.
+        """
+        best = None
+        best_u = None
+        for u in hurwitzint.units():
+            cand = self * u
+            key = cand.components2()
+            if best is None or key < best:
+                best = key
+                best_u = u
+
+        assert best_u is not None
+        return self * best_u, best_u
+
+    def content(self) -> int:
+        """
+        Largest positive integer m such that self = m*q' with q' still a Hurwitz integer.
+            Computed in numerator-units with the Hurwitz parity constraint.
+
+        Returns:
+            int: Computed content value.
+        """
+        A, B, C, D = self.a, self.b, self.c, self.d
+        # TODO: Once Py3.8 support has been dropped, upgrade this to a single call
+        g = gcd(gcd(abs(A), abs(B)), gcd(abs(C), abs(D)))
+
+        if g == 0:
+            return 0
+
+        # Adjust by powers of two until the reduced tuple is all same parity.
+        while g > 0:
+            a, b, c, d = A // g, B // g, C // g, D // g
+            if (((a ^ b) & 1) == 0) and (((a ^ c) & 1) == 0) and (((a ^ d) & 1) == 0):
+                return g
+            g //= 2
+
+        return 1  # practically unreachable for nonzero, but safe
+
+    @staticmethod
+    def _find_uv_for_prime(p: int) -> Tuple[int, int]:
+        """
+        Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
+            Deterministic search over u with Tonelli sqrt for v.
+
+        Returns:
+            tuple: The found u,v where 1 + u^2 + v^2 ≡ 0 (mod p).
+
+        Raises:
+            ArithmeticError: If we fail to find a good u,v pair.
+        """
+        p = int(p)
+        if p == 2:
+            return 0, 1
+
+        for u in range(p):
+            t = (-1 - (u * u)) % p
+            v = mod_sqrt_prime(t, p)
+            if v is not None:
+                return u, v
+
+        raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
+
+    @staticmethod
+    def _prime_over_rational(p: int) -> "hurwitzint":
+        """
+        Build a deterministic Hurwitz prime with norm p by Euclid from (p, 1+ui+vj).
+            This mirrors the standard construction used in proofs of 4-squares and irreducibles.
+
+        Returns:
+            hurwitzint: A Hurwitz prime with norm p.
+
+        Raises:
+            ArithmeticError: If we fail to find a Hurwitz prime with norm p.
+        """
+        p = int(p)
+
+        if p == 2:
+            # A simple norm-2 prime
+            base = hurwitzint(1, 1, 0, 0)  # norm 2
+        else:
+            u, v = hurwitzint._find_uv_for_prime(p)
+            q = hurwitzint(1, u, v, 0)  # Lipschitz element in H(Z)
+            base = hurwitzint.gcd_right(hurwitzint(p, 0, 0, 0), q)
+
+        if abs(base) != p:
+            raise ArithmeticError("prime construction failed: gcd did not have norm p")
+
+        # Canonicalize base up to left associates (unit migration friendly for right factoring)
+        base_canon, _ = base._canonical_left_associate()
+        return base_canon
+
+    @staticmethod
+    def _extract_right_prime(q: "hurwitzint", p: int) -> "hurwitzint":
+        """
+        Find a Hurwitz prime of norm p that right-divides q.
+        Deterministic search over unit conjugates of a cached base prime.
+
+        Returns:
+            hurwitzint: A prime in p extracted from q.
+
+        Raises:
+            ArithmeticError: If there is a failure to extract a prime.
+        """
+        base = hurwitzint._prime_over_rational(p)
+
+        # Search a reasonably complete orbit: ul * base * ur
+        # (576 candidates, cheap compared to heavy arithmetic elsewhere)
+        best = None
+        for ul in hurwitzint.units():
+            left = ul * base
+            for ur in hurwitzint.units():
+                cand = left * ur
+                g = hurwitzint.gcd_right(q, cand)
+                if abs(g) == p:
+                    # normalize g canonically (unit migration): u*g
+                    g_canon, _ = g._canonical_left_associate()
+                    key = g_canon.components2()
+                    if best is None or key < best[0]:
+                        best = (key, g_canon)
+
+        if best is None:
+            raise ArithmeticError(f"Failed to extract right prime over p={p}")
+
+        return best[1]
+
+    def factor_right(self) -> HurwitzFactorization:
+        """
+        Deterministic right factorization normal form (primitive-first).
+
+        Returns content, unit, and a tuple of Hurwitz primes P1..Pk such that:
+            self = content * unit * P1 * P2 * ... * Pk
+
+        Notes:
+          - We do NOT expand `content` into Hurwitz primes by default because scalar
+            factorization is exactly where recombination/nonuniqueness explodes.
+          - Each Pi is irreducible because its norm is a rational prime.
+
+        Returns:
+            HurwitzFactorization: The factorization.
+
+        Raises:
+            ArithmeticError: If there is a problem preventing factoring.
+        """
+        if not self:
+            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=())
+
+        # Extract integer content
+        m = self.content()
+        if m < 0:
+            m = -m
+
+        q = self
+        if m > 1:
+            q, r = divmod(q, hurwitzint(m, 0, 0, 0))
+            if r:
+                # Shouldn't happen if content() is correct
+                raise ArithmeticError("content division produced remainder")
+
+        # Now q is primitive (or at least has no large integer content).
+        n = abs(q)
+        nf = factorint(n)
+
+        primes: List[hurwitzint] = []
+        for p in sorted(nf.keys()):
+            e = nf[p]
+            for _ in range(e):
+                pi = hurwitzint._extract_right_prime(q, p)
+
+                # divide on the right: q = qq * pi + 0
+                qq, rr = divmod(q, pi)
+                if rr:
+                    raise ArithmeticError("extracted prime did not actually divide (unexpected)")
+                q = qq
+                primes.append(pi)
+
+        # Remaining q must be a unit (norm 1) if we extracted all prime norms.
+        if abs(q) != 1:
+            raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
+
+        unit = hurwitzint._normalize_unit(q)
+        return HurwitzFactorization(content=m, unit=unit, primes=tuple(primes))
+
+    def factor_left(self) -> HurwitzFactorization:
+        """
+        Deterministic left factorization normal form.
+
+        Produces:
+            self = content * (P1 * P2 * ... * Pk) * unit
+
+        (Same content logic; primes are normalized via right-associates instead.)
+
+        Returns:
+            HurwitzFactorization: The factorization.
+
+        Raises:
+            ArithmeticError: If there is a problem preventing factoring.
+        """
+        if not self:
+            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=())
+
+        m = self.content()
+        if m < 0:
+            m = -m
+
+        q = self
+        if m > 1:
+            q, r = q.rdivmod(hurwitzint(m, 0, 0, 0))
+            if r:
+                raise ArithmeticError("content division produced remainder")
+
+        n = abs(q)
+        nf = factorint(n)
+
+        primes: List[hurwitzint] = []
+        for p in sorted(nf.keys()):
+            e = nf[p]
+            for _ in range(e):
+                # Extract a LEFT prime factor of norm p:
+                # do the symmetric trick by factoring the conjugate on the right,
+                # then conjugating back.
+                pi_r = hurwitzint._extract_right_prime(q.conjugate(), p).conjugate()
+
+                # Normalize for left-factorization by right-multiplying a unit: pi = pi_r * u
+                pi, _ = pi_r._canonical_right_associate()
+
+                # Divide on the left: q = pi * qq
+                qq, rr = q.rdivmod(pi)
+                if rr:
+                    raise ArithmeticError("extracted left prime did not actually divide (unexpected)")
+                q = qq
+                primes.append(pi)
+
+        if abs(q) != 1:
+            raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
+
+        unit = hurwitzint._normalize_unit(q)
+        return HurwitzFactorization(content=m, unit=unit, primes=tuple(primes))
     # endregion
 
 
