@@ -1,6 +1,3 @@
-import functools
-import operator
-
 from math import isqrt, prod
 from pathlib import Path
 from typing import Union
@@ -9,7 +6,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import hurwitzint
+from quatint.quat import hurwitzint, prod_left
 
 def test_compiled_tests():
     """Verify that we are running these tests with a compiled version of hurwitzint"""
@@ -357,7 +354,6 @@ class TestFactorLeft(HurwitzIntTests):
 
     def test_main(self):
         """Validate factor works as expected."""
-        prod_left = lambda x, start=1: functools.reduce(operator.mul, x, 1) * start  # noqa: E731
         factors = self.b_int.factor_left()
 
         ans = prod_left(factors.primes, start=factors.unit)

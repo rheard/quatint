@@ -1,3 +1,6 @@
+import functools
+import operator
+
 from dataclasses import dataclass
 from math import gcd
 from typing import Callable, Iterator, List, Optional, Tuple, Union
@@ -920,3 +923,8 @@ def gcd_left(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
 def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
     """Simply a helper method to match existing Python gcd syntax"""
     return a.gcd_right(b)
+
+
+def prod_left(x, start=1):
+    """Simply a helper method to match existing Python prod syntax"""
+    return functools.reduce(operator.mul, x, 1) * start  # noqa: E731
