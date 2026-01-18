@@ -1,3 +1,4 @@
+from math import isqrt
 from pathlib import Path
 from typing import Union
 
@@ -213,7 +214,7 @@ class TestRDiv(HurwitzIntTests):
     """Tests for rtruediv and rfloordiv"""
 
     def test_rdiv(self):
-        """Test complexint \ complexint"""
+        r"""Test complexint \ complexint"""
         g = hurwitzint(1, 0, 0, 1)
         i = hurwitzint(0, 1, 0, 0)
 
@@ -222,3 +223,115 @@ class TestRDiv(HurwitzIntTests):
         q, r = a.rdivmod(g)
         assert not r
         assert g * q == a
+
+
+class TestGcdLeft(HurwitzIntTests):
+    """Tests for gcd_left"""
+
+    @staticmethod
+    def assert_left_divides(x: hurwitzint, g: hurwitzint):
+        """Assert that g left-divides x (x = g*q, remainder 0 under right-division rdivmod)."""
+        q, r = x.rdivmod(g)
+        assert not r
+        assert isinstance(q, hurwitzint)
+        assert isinstance(r, hurwitzint)
+
+    def test_zero(self):
+        """gcd_left(a, 0) should return an associate of a (same norm) and left-divide a."""
+        z = hurwitzint(0, 0, 0, 0)
+        a = self.a_int
+
+        d = a.gcd_left(z)
+
+        self.assert_left_divides(a, d)
+        assert abs(d) == abs(a)
+
+    def test_recovers_constructed_common_factor(self):
+        """gcd_left should recover a constructed common factor up to a unit (checked via norm)."""
+        # Use units so we don't accidentally introduce extra common factors.
+        i = hurwitzint(0, 1, 0, 0)
+        j = hurwitzint(0, 0, 1, 0)
+
+        # A small non-unit common left factor (norm 2 is the simplest).
+        g = hurwitzint(1, 1, 0, 0)
+
+        a = g * i
+        b = g * j
+
+        d = a.gcd_left(b)
+
+        # d is a common left divisor
+        self.assert_left_divides(a, d)
+        self.assert_left_divides(b, d)
+
+        # "Greatest": our known common divisor g must be a left multiple of d
+        self.assert_left_divides(g, d)
+
+        # If N(g) == N(d), then g = u*d for a unit u (so d matches g up to a unit).
+        assert abs(d) == abs(g)
+
+
+class TestGcdRight(HurwitzIntTests):
+    """Tests for gcd_right"""
+
+    @staticmethod
+    def assert_right_divides(x: hurwitzint, g: hurwitzint):
+        """Assert that g right-divides x (x = q*g, remainder 0 under left-division divmod)."""
+        q, r = divmod(x, g)
+        assert not r
+        assert isinstance(q, hurwitzint)
+        assert isinstance(r, hurwitzint)
+
+    def test_zero(self):
+        """gcd_right(a, 0) should return an associate of a (same norm) and right-divide a."""
+        z = hurwitzint(0, 0, 0, 0)
+        a = self.a_int
+
+        d = hurwitzint.gcd_right(a, z)
+
+        self.assert_right_divides(a, d)
+        assert abs(d) == abs(a)
+
+    def test_recovers_constructed_common_factor(self):
+        """gcd_right should recover a constructed common factor up to a unit (checked via norm)."""
+        # Use units so we don't accidentally introduce extra common factors.
+        i = hurwitzint(0, 1, 0, 0)
+        j = hurwitzint(0, 0, 1, 0)
+
+        # A small non-unit common right factor (norm 2 is the simplest).
+        g = hurwitzint(1, 1, 0, 0)
+
+        a = i * g
+        b = j * g
+
+        d = a.gcd_right(b)
+
+        # d is a common right divisor
+        self.assert_right_divides(a, d)
+        self.assert_right_divides(b, d)
+
+        # "Greatest": our known common divisor g must be a right multiple of d
+        self.assert_right_divides(g, d)
+
+        # If N(g) == N(d), then g = u*d for a unit u (so d matches g up to a unit).
+        assert abs(d) == abs(g)
+
+
+class TestGcd(HurwitzIntTests):
+    """Tests for gcd_left and gcd_right"""
+
+    def test_gcd_agrees_with_integer_gcd_on_scalars(self):
+        """For purely real scalars, gcd_left/gcd_right should match the integer gcd (up to sign/unit)."""
+        a = hurwitzint(6, 0, 0, 0)
+        b = hurwitzint(15, 0, 0, 0)
+
+        dr = a.gcd_right(b)
+        dl = a.gcd_left(b)
+
+        # Scalar n has norm n^2, so sqrt(norm(gcd)) should recover gcd(|a|,|b|)=3
+        assert isqrt(abs(dr)) == 3
+        assert isqrt(abs(dl)) == 3
+
+        # And the gcd should be purely real (imag parts 0)
+        assert list(dr)[1:] == [0, 0, 0]
+        assert list(dl)[1:] == [0, 0, 0]

@@ -456,7 +456,105 @@ class hurwitzint:
             return f"({out})/{den}"
         return out
 
+    # region GCD
+    def _normalize_unit(self) -> "hurwitzint":
+        """
+        Deterministic associate choice up to ±1.
+
+        Full normalization up to the 24 Hurwitz units is possible, but this keeps things
+        cheap and stable: multiply by -1 so the first nonzero numerator component is > 0.
+
+        Returns:
+            hurwitzint: The unit normalized hurwitzint.
+        """
+        if not self:
+            return self
+
+        a, b, c, d = self
+        if a != 0:
+            return -self if a < 0 else self
+        if b != 0:
+            return -self if b < 0 else self
+        if c != 0:
+            return -self if c < 0 else self
+        return -self if d < 0 else self
+
+    def _gcd(self,
+             other: OP_TYPES,
+             *,
+             divmod_method: Callable = divmod,
+             normalize: bool = True) -> "hurwitzint":
+        """GCD via Euclidean algorithm."""
+        if isinstance(other, _OTHER_OP_TYPES):
+            other = self._from_obj(other)
+
+        if not isinstance(other, hurwitzint):
+            raise TypeError(f"Unable to divide hurwitzint and type {type(other)}")
+
+        a = self
+        b = other
+
+        if not a:
+            return b._normalize_unit() if normalize else b
+
+        if b:
+            last = abs(b)
+            while b:
+                _, r = divmod_method(a, b)
+                a, b = b, r
+
+                if b:
+                    nb = abs(b)
+                    if nb >= last:
+                        raise ArithmeticError("Euclidean descent failed (non-decreasing remainder norm)")
+                    last = nb
+
+        return a._normalize_unit() if normalize else a
+
+    def gcd_right(self,
+                  other: OP_TYPES,
+                  *,
+                  normalize: bool = True) -> "hurwitzint":
+        """
+        Right gcd via left-division Euclidean algorithm.
+
+        The result g is a "right gcd":
+            a = q*b + r
+            a = a' * g and b = b' * g   (up to multiplication by a unit)
+
+        Returns:
+            hurwitzint: The gcd.
+        """
+        return self._gcd(other, normalize=normalize)
+
+    def gcd_left(self,
+                 other: OP_TYPES,
+                 *,
+                 normalize: bool = True) -> "hurwitzint":
+        """
+        Left gcd via RIGHT-division Euclidean algorithm.
+
+        The result g is a "left gcd":
+            a = b*q + r
+            a = g * a' and b = g * b'   (up to multiplication by a unit)
+
+        Returns:
+            hurwitzint: The gcd.
+        """
+        return self._gcd(other, divmod_method=rdivmod, normalize=normalize)
+    # endregion
+
 
 def rdivmod(a: "hurwitzint", b: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
     """Simply a helper method to match existing Python divmod syntax"""
     return a.rdivmod(b)
+
+
+def gcd_left(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
+    """Simply a helper method to match existing Python gcd syntax"""
+    return a.gcd_left(b)
+
+
+def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
+    """Simply a helper method to match existing Python gcd syntax"""
+    return a.gcd_right(b)
