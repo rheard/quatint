@@ -1,9 +1,6 @@
-import functools
-import operator
-
 from dataclasses import dataclass
 from math import gcd
-from typing import Callable, Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterator, Optional, Union
 
 from sympy import factorint
 
@@ -12,9 +9,7 @@ _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
 
 
-# TODO: Once Py3.8 support has been dropped, add slots=True
-# @dataclass(frozen=True, slots=True)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HurwitzFactorization:
     """
     Canonical-ish normal form (deterministic):
@@ -27,7 +22,7 @@ class HurwitzFactorization:
     """
     content: int
     unit: "hurwitzint"
-    primes: Tuple["hurwitzint", ...]
+    primes: tuple["hurwitzint", ...]
 
 
 def _round_div_ties_away_from_zero(a: int, b: int) -> int:
@@ -190,7 +185,7 @@ class hurwitzint:
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
         return self._make(self.a, -self.b, -self.c, -self.d)
 
-    def components2(self) -> Tuple[int, int, int, int]:
+    def components2(self) -> tuple[int, int, int, int]:
         """Return the stored numerator components (A,B,C,D) for (...)/2."""
         return (self.a, self.b, self.c, self.d)
 
@@ -277,7 +272,7 @@ class hurwitzint:
             divisor: "hurwitzint",
             divisor_norm: int,
             remainder: Callable[["hurwitzint", "hurwitzint", "hurwitzint"], "hurwitzint"] = lambda a, b, c: a - b * c) \
-            -> Tuple["hurwitzint", "hurwitzint"]:
+            -> tuple["hurwitzint", "hurwitzint"]:
         """
         A shared division algorithm.
 
@@ -336,7 +331,7 @@ class hurwitzint:
         return q, r
 
     # region Left-division helpers (non-commutative!)
-    def __divmod__(self, other: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
+    def __divmod__(self, other: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
         """
         Nearest-lattice division in the Hurwitz quaternion order.
 
@@ -396,7 +391,7 @@ class hurwitzint:
     # endregion
 
     # region Right-division helpers
-    def rdivmod(self, other: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
+    def rdivmod(self, other: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
         """
         Right-quotient division in the Hurwitz quaternion order.
 
@@ -499,7 +494,7 @@ class hurwitzint:
             ra, rb, rc, rd = self.a, self.b, self.c, self.d
             den = 2
 
-        terms: List[Tuple[int, str]] = [(ra, ""), (rb, "i"), (rc, "j"), (rd, "k")]
+        terms: list[tuple[int, str]] = [(ra, ""), (rb, "i"), (rc, "j"), (rd, "k")]
 
         out = ""
         first = True
@@ -620,10 +615,10 @@ class hurwitzint:
 
     # region Factoring
     @staticmethod
-    def units() -> Tuple["hurwitzint", ...]:
+    def units() -> tuple["hurwitzint", ...]:
         """All the unit directions from the origin"""
         # ±1, ±i, ±j, ±k, and (±1±i±j±k)/2 (16 of them).
-        out: List[hurwitzint] = []
+        out: list[hurwitzint] = []
 
         one = hurwitzint(1, 0, 0, 0)
         i = hurwitzint(0, 1, 0, 0)
@@ -646,7 +641,7 @@ class hurwitzint:
         out.sort(key=lambda u: u.components2())
         return tuple(out)
 
-    def _canonical_left_associate(self) -> Tuple["hurwitzint", "hurwitzint"]:
+    def _canonical_left_associate(self) -> tuple["hurwitzint", "hurwitzint"]:
         """
         Unit-migration normalization for a *right* factor:
             replace p by u*p (u a unit) to get a canonical representative.
@@ -666,7 +661,7 @@ class hurwitzint:
         assert best_u is not None
         return best_u * self, best_u
 
-    def _canonical_right_associate(self) -> Tuple["hurwitzint", "hurwitzint"]:
+    def _canonical_right_associate(self) -> tuple["hurwitzint", "hurwitzint"]:
         """
         Unit-migration normalization for a *left* factor:
             replace p by p*u (u a unit).
@@ -695,8 +690,7 @@ class hurwitzint:
             int: Computed content value.
         """
         A, B, C, D = self.a, self.b, self.c, self.d
-        # TODO: Once Py3.8 support has been dropped, upgrade this to a single call
-        g = gcd(gcd(abs(A), abs(B)), gcd(abs(C), abs(D)))
+        g = gcd(abs(A), abs(B), abs(C), abs(D))
 
         if g == 0:
             return 0
@@ -711,7 +705,7 @@ class hurwitzint:
         return 1  # practically unreachable for nonzero, but safe
 
     @staticmethod
-    def _find_uv_for_prime(p: int) -> Tuple[int, int]:
+    def _find_uv_for_prime(p: int) -> tuple[int, int]:
         """
         Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
             Deterministic search over u with Tonelli sqrt for v.
@@ -834,7 +828,7 @@ class hurwitzint:
         n = abs(q)
         nf = factorint(n)
 
-        primes: List[hurwitzint] = []
+        primes: list[hurwitzint] = []
         for p in sorted(nf.keys()):
             e = nf[p]
             for _ in range(e):
@@ -885,7 +879,7 @@ class hurwitzint:
         n = abs(q)
         nf = factorint(n)
 
-        primes: List[hurwitzint] = []
+        primes: list[hurwitzint] = []
         for p in sorted(nf.keys()):
             e = nf[p]
             for _ in range(e):
@@ -912,7 +906,7 @@ class hurwitzint:
     # endregion
 
 
-def rdivmod(a: "hurwitzint", b: OP_TYPES) -> Tuple["hurwitzint", "hurwitzint"]:
+def rdivmod(a: "hurwitzint", b: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
     """Simply a helper method to match existing Python divmod syntax"""
     return a.rdivmod(b)
 
