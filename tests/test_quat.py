@@ -207,3 +207,18 @@ class TestDiv(HurwitzIntTests):
 
         self.assert_equal(res_q, res_int_q)
         self.assert_equal(res_r, res_int_r)
+
+
+class TestRDiv(HurwitzIntTests):
+    """Tests for rtruediv and rfloordiv"""
+
+    def test_rdiv(self):
+        """Test complexint \ complexint"""
+        g = hurwitzint(1, 0, 0, 1)
+        i = hurwitzint(0, 1, 0, 0)
+
+        a = i * g
+
+        q, r = a.rdivmod(g)
+        assert not r
+        assert g * q == a
