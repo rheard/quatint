@@ -1,4 +1,4 @@
-from math import isqrt, prod
+from math import isqrt
 from pathlib import Path
 from typing import Union
 
@@ -6,7 +6,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import hurwitzint, prod_left
+from quatint.quat import hurwitzint, prod_left, prod_right
 
 def test_compiled_tests():
     """Verify that we are running these tests with a compiled version of hurwitzint"""
@@ -344,7 +344,7 @@ class TestFactorRight(HurwitzIntTests):
         """Validate factor works as expected."""
         factors = self.b_int.factor_right()
 
-        ans = prod(reversed(factors.primes), start=factors.unit)
+        ans = prod_right(factors.primes, unit=factors.unit)
 
         self.assert_equal(self.b_int, ans)
 
@@ -356,6 +356,6 @@ class TestFactorLeft(HurwitzIntTests):
         """Validate factor works as expected."""
         factors = self.b_int.factor_left()
 
-        ans = prod_left(factors.primes, start=factors.unit)
+        ans = prod_left(factors.primes, unit=factors.unit)
 
         self.assert_equal(self.b_int, ans)

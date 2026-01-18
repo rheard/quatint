@@ -927,6 +927,25 @@ def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
     return a.gcd_right(b)
 
 
-def prod_left(x: Iterator[object], start: object = 1):
+def prod_right(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None):
     """Simply a helper method to match existing Python prod syntax"""
-    return functools.reduce(operator.mul, x, 1) * start
+    product: hurwitzint = hurwitzint(1, 0, 0, 0)
+    for sub_x in x:
+        product = sub_x * product
+
+    if unit is None:
+        unit = hurwitzint(1, 0, 0, 0)
+
+    return unit * product
+
+
+def prod_left(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None):
+    """Simply a helper method to match existing Python prod syntax"""
+    primes: hurwitzint = hurwitzint(1, 0, 0, 0)
+    for sub_x in x:
+        primes *= sub_x
+
+    if unit is None:
+        unit = hurwitzint(1, 0, 0, 0)
+
+    return primes * unit
