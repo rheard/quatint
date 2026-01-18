@@ -15,7 +15,7 @@ authors = [
 ]
 description = "A quatint class, for using quaternions backed by integers and half-integers (Hurwitz integers)."
 readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -37,7 +37,7 @@ dependencies = [
 Repository = "https://github.com/rheard/quatint"
 
 [tool.cibuildwheel]
-build = "cp3{8,9,10,11,12,13}-{win,macosx,manylinux}*"
+build = "cp3{10,11,12,13}-{win,macosx,manylinux}*"
 
 before-test = [
     'mkdir "{project}/temp"',
