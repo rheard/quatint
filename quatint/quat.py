@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from math import gcd
-from typing import Callable, Iterator, Optional, Union
+from math import gcd, prod
+from typing import Callable, Iterable, Iterator, Optional, Union
 
 from sympy import factorint
 
@@ -25,6 +25,14 @@ class HurwitzFactorization:
     content: int
     unit: "hurwitzint"
     primes: tuple["hurwitzint", ...]
+
+    def prod_right(self):
+        """Recreate the number using prod_right"""
+        return prod_right(self.primes, start=self.unit * self.content)
+
+    def prod_left(self):
+        """Recreate the number using prod_left"""
+        return prod_left(self.primes, start=self.unit * self.content)
 
 
 def _round_div_ties_away_from_zero(a: int, b: int) -> int:
@@ -922,19 +930,20 @@ def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
     return a.gcd_right(b)
 
 
-def prod_right(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None, content: int = 1):
+def prod_right(x: Iterable[OP_TYPES], start: Union[OP_TYPES, None] = None):
     """Simply a helper method to match existing Python prod syntax"""
-    product: hurwitzint = content * unit
-    for sub_x in x:
-        product *= sub_x
+    if start is None:
+        start = 1
 
-    return product
+    return prod(x, start=start)
 
 
-def prod_left(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None, content: int = 1):
+def prod_left(x: Iterable[OP_TYPES], start: Union[OP_TYPES, None] = None):
     """Simply a helper method to match existing Python prod syntax"""
-    product: hurwitzint = content * unit
-    for sub_x in x:
-        product = sub_x * product
+    if start is None:
+        start = 1
 
-    return product
+    for sub_x in x:
+        start = sub_x * start
+
+    return start
