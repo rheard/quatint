@@ -504,36 +504,26 @@ class hurwitzint:
             ra, rb, rc, rd = self.a, self.b, self.c, self.d
             den = 2
 
-        terms: list[tuple[int, str]] = [(ra, ""), (rb, "i"), (rc, "j"), (rd, "k")]
+        # Special-case: only time we omit parentheses is when den is None and
+        # ra=rb=rc=0, so we're displaying a pure k-term (like Python's "2j").
+        if den is None and ra == 0 and rb == 0 and rc == 0:
+            if rd == 1:
+                return "k"
+            if rd == -1:
+                return "-k"
+            return f"{rd}k"
 
-        out = ""
-        first = True
-        for coeff, sym in terms:
-            if coeff == 0:
-                continue
-
-            sign = "-" if coeff < 0 else "+"
+        def _imag_term(coeff: int, sym: str) -> str:
+            sign = "+" if coeff >= 0 else "-"
             mag = -coeff if coeff < 0 else coeff
-
-            if first:
-                # leading sign only if negative
-                if coeff < 0:
-                    out += "-"
-                first = False
+            if mag == 1:
+                mag_str = ""  # 1i -> i
             else:
-                out += sign
+                mag_str = str(mag)  # 0i stays "0i", 2i -> "2i"
+            return f"{sign}{mag_str}{sym}"
 
-            if sym:
-                if mag == 1:
-                    out += sym
-                else:
-                    out += f"{mag}{sym}"
-            else:
-                out += str(mag)
-
-        if den:
-            return f"({out})/{den}"
-        return out
+        core = f"({ra}{_imag_term(rb, 'i')}{_imag_term(rc, 'j')}{_imag_term(rd, 'k')})"
+        return f"{core}/{den}" if den is not None else core
 
     # region GCD
     def _normalize_unit(self) -> "hurwitzint":
