@@ -759,8 +759,7 @@ class hurwitzint:
         base_canon, _ = base._canonical_left_associate()
         return base_canon
 
-    @staticmethod
-    def _extract_right_prime(q: "hurwitzint", p: int) -> "hurwitzint":
+    def _extract_right_prime(self, p: int) -> "hurwitzint":
         """
         Find a Hurwitz prime of norm p that right-divides q.
         Deterministic search over unit conjugates of a cached base prime.
@@ -780,7 +779,7 @@ class hurwitzint:
             left = ul * base
             for ur in hurwitzint.units():
                 cand = left * ur
-                g = hurwitzint.gcd_right(q, cand)
+                g = hurwitzint.gcd_right(self, cand)
                 if abs(g) == p:
                     # normalize g canonically (unit migration): u*g
                     g_canon, _ = g._canonical_left_associate()
@@ -834,7 +833,7 @@ class hurwitzint:
         for p in sorted(nf.keys()):
             e = nf[p]
             for _ in range(e):
-                pi = hurwitzint._extract_right_prime(q, p)
+                pi = q._extract_right_prime(p)
 
                 # divide on the right: q = qq * pi + 0
                 qq, rr = divmod(q, pi)
@@ -888,7 +887,7 @@ class hurwitzint:
                 # Extract a LEFT prime factor of norm p:
                 # do the symmetric trick by factoring the conjugate on the right,
                 # then conjugating back.
-                pi_r = hurwitzint._extract_right_prime(q.conjugate(), p).conjugate()
+                pi_r = q.conjugate()._extract_right_prime(p).conjugate()
 
                 # Normalize for left-factorization by right-multiplying a unit: pi = pi_r * u
                 pi, _ = pi_r._canonical_right_associate()
