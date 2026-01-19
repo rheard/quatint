@@ -519,10 +519,7 @@ class hurwitzint:
         def _imag_term(coeff: int, sym: str) -> str:
             sign = "+" if coeff >= 0 else "-"
             mag = -coeff if coeff < 0 else coeff
-            if mag == 1:
-                mag_str = ""  # 1i -> i
-            else:
-                mag_str = str(mag)  # 0i stays "0i", 2i -> "2i"
+            mag_str = "" if mag == 1 else str(mag) # 1i -> i
             return f"{sign}{mag_str}{sym}"
 
         core = f"({ra}{_imag_term(rb, 'i')}{_imag_term(rc, 'j')}{_imag_term(rd, 'k')})"
@@ -773,7 +770,7 @@ class hurwitzint:
         Deterministic right factorization normal form (primitive-first).
 
         Returns content, unit, and a tuple of Hurwitz primes P1..Pk such that:
-            self = content * unit * P1 * P2 * ... * Pk
+            self = P1 * P2 * ... * Pk * content * unit
 
         Notes:
           - We do NOT expand `content` into Hurwitz primes by default because scalar
@@ -784,7 +781,7 @@ class hurwitzint:
             HurwitzFactorization: The factorization.
 
         Raises:
-            ArithmeticError: If there is a problem preventing factoring.
+            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
         if not self:
             return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=())
