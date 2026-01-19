@@ -38,6 +38,7 @@ dependencies = [
 Repository = "https://github.com/rheard/quatint"
 
 [tool.cibuildwheel]
+# TODO: Android, iOS?
 build = "cp3{9,10,11,12,13,14}-{win,macosx,manylinux}*"
 
 before-test = [
