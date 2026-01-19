@@ -734,36 +734,24 @@ class hurwitzint:
 
     def _extract_right_prime(self, p: int) -> "hurwitzint":
         """
-        Find a Hurwitz prime of norm p that right-divides q.
-        Deterministic search over unit conjugates of a cached base prime.
+        Extract a right prime of norm p dividing self.
+            g = gcd_right(self, p)
 
         Returns:
-            hurwitzint: A prime in p extracted from q.
+            hurwitzint: A Hurwitz prime with norm p that divides self.
 
         Raises:
-            ArithmeticError: If there is a failure to extract a prime.
+            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
-        base = hurwitzint._prime_over_rational(p)
+        # Directly extract from q via gcd with the scalar p
+        scalar = hurwitzint(p, 0, 0, 0)
+        g = self.gcd_right(scalar, normalize=False)
 
-        # Search a reasonably complete orbit: ul * base * ur
-        # (576 candidates, cheap compared to heavy arithmetic elsewhere)
-        best = None
-        for ul in hurwitzint.UNITS:
-            left = ul * base
-            for ur in hurwitzint.UNITS:
-                cand = left * ur
-                g = hurwitzint.gcd_right(self, cand)
-                if abs(g) == p:
-                    # normalize g canonically (unit migration): u*g
-                    g_canon, _ = g._canonical_left_associate()
-                    key = g_canon.components2()
-                    if best is None or key < best[0]:
-                        best = (key, g_canon)
+        if abs(g) != p:
+            raise ArithmeticError(f"Failed to extract right prime for {p=}")
 
-        if best is None:
-            raise ArithmeticError(f"Failed to extract right prime over p={p}")
-
-        return best[1]
+        g_canon, _ = g._canonical_left_associate()
+        return g_canon
 
     def factor_right(self) -> HurwitzFactorization:
         """
