@@ -847,7 +847,7 @@ class hurwitzint:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
         unit = hurwitzint._normalize_unit(q)
-        return HurwitzFactorization(content=m, unit=unit, primes=tuple(primes))
+        return HurwitzFactorization(content=m, unit=unit, primes=tuple(reversed(primes)))
 
     def factor_left(self) -> HurwitzFactorization:
         """
@@ -903,7 +903,7 @@ class hurwitzint:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
         unit = hurwitzint._normalize_unit(q)
-        return HurwitzFactorization(content=m, unit=unit, primes=tuple(primes))
+        return HurwitzFactorization(content=m, unit=unit, primes=tuple(reversed(primes)))
     # endregion
 
 
@@ -922,25 +922,19 @@ def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
     return a.gcd_right(b)
 
 
-def prod_right(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None):
+def prod_right(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None, content: int = 1):
     """Simply a helper method to match existing Python prod syntax"""
-    product: hurwitzint = hurwitzint(1, 0, 0, 0)
+    product: hurwitzint = content * unit
+    for sub_x in x:
+        product *= sub_x
+
+    return product
+
+
+def prod_left(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None, content: int = 1):
+    """Simply a helper method to match existing Python prod syntax"""
+    product: hurwitzint = content * unit
     for sub_x in x:
         product = sub_x * product
 
-    if unit is None:
-        unit = hurwitzint(1, 0, 0, 0)
-
-    return unit * product
-
-
-def prod_left(x: Iterator[OP_TYPES], unit: Union["hurwitzint", None] = None):
-    """Simply a helper method to match existing Python prod syntax"""
-    primes: hurwitzint = hurwitzint(1, 0, 0, 0)
-    for sub_x in x:
-        primes *= sub_x
-
-    if unit is None:
-        unit = hurwitzint(1, 0, 0, 0)
-
-    return primes * unit
+    return product

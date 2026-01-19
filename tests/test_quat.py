@@ -344,7 +344,7 @@ class TestFactorRight(HurwitzIntTests):
         """Validate factor works as expected."""
         factors = self.b_int.factor_right()
 
-        ans = prod_right(factors.primes, unit=factors.unit)
+        ans = prod_right(factors.primes, unit=factors.unit, content=factors.content)
 
         self.assert_equal(self.b_int, ans)
 
@@ -356,6 +356,6 @@ class TestFactorLeft(HurwitzIntTests):
         """Validate factor works as expected."""
         factors = self.b_int.factor_left()
 
-        ans = prod_left(factors.primes, unit=factors.unit)
+        ans = prod_left(factors.primes, unit=factors.unit, content=factors.content)
 
         self.assert_equal(self.b_int, ans)
