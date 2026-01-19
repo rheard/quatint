@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import cache
 from math import gcd, prod
 from typing import Callable, ClassVar, Iterable, Iterator, Optional, Union
 
@@ -680,6 +681,7 @@ class hurwitzint:
         return 1  # practically unreachable for nonzero, but safe
 
     @staticmethod
+    @cache
     def _find_uv_for_prime(p: int) -> tuple[int, int]:
         """
         Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
@@ -704,6 +706,7 @@ class hurwitzint:
         raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
 
     @staticmethod
+    @cache
     def _prime_over_rational(p: int) -> "hurwitzint":
         """
         Build a deterministic Hurwitz prime with norm p by Euclid from (p, 1+ui+vj).
