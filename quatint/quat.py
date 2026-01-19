@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from math import gcd, prod
-from typing import Callable, Iterable, Iterator, Optional, Union
+from typing import Callable, ClassVar, Iterable, Iterator, Optional, Union
 
 from sympy import factorint
 
@@ -119,6 +119,8 @@ class hurwitzint:
     b: int
     c: int
     d: int
+
+    UNITS: ClassVar[list["hurwitzint"]] = []
 
     def __init__(
         self,
@@ -614,33 +616,6 @@ class hurwitzint:
     # endregion
 
     # region Factoring
-    @staticmethod
-    def units() -> tuple["hurwitzint", ...]:
-        """All the unit directions from the origin"""
-        # ±1, ±i, ±j, ±k, and (±1±i±j±k)/2 (16 of them).
-        out: list[hurwitzint] = []
-
-        one = hurwitzint(1, 0, 0, 0)
-        i = hurwitzint(0, 1, 0, 0)
-        j = hurwitzint(0, 0, 1, 0)
-        k = hurwitzint(0, 0, 0, 1)
-
-        for s in (-1, 1):
-            out.extend((s * one, s * i, s * j, s * k))
-
-        # 16 half-units
-        out.extend([
-            hurwitzint(a, b, c, d, half=True)
-            for a in (-1, 1)
-            for b in (-1, 1)
-            for c in (-1, 1)
-            for d in (-1, 1)
-        ])
-
-        # Optional: make ordering stable
-        out.sort(key=lambda u: u.components2())
-        return tuple(out)
-
     def _canonical_left_associate(self) -> tuple["hurwitzint", "hurwitzint"]:
         """
         Unit-migration normalization for a *right* factor:
@@ -651,7 +626,7 @@ class hurwitzint:
         """
         best = None
         best_u = None
-        for u in hurwitzint.units():
+        for u in hurwitzint.UNITS:
             cand = u * self
             key = cand.components2()
             if best is None or key < best:
@@ -671,7 +646,7 @@ class hurwitzint:
         """
         best = None
         best_u = None
-        for u in hurwitzint.units():
+        for u in hurwitzint.UNITS:
             cand = self * u
             key = cand.components2()
             if best is None or key < best:
@@ -773,9 +748,9 @@ class hurwitzint:
         # Search a reasonably complete orbit: ul * base * ur
         # (576 candidates, cheap compared to heavy arithmetic elsewhere)
         best = None
-        for ul in hurwitzint.units():
+        for ul in hurwitzint.UNITS:
             left = ul * base
-            for ur in hurwitzint.units():
+            for ur in hurwitzint.UNITS:
                 cand = left * ur
                 g = hurwitzint.gcd_right(self, cand)
                 if abs(g) == p:
@@ -903,6 +878,36 @@ class hurwitzint:
         unit = hurwitzint._normalize_unit(q)
         return HurwitzFactorization(content=m, unit=unit, primes=tuple(reversed(primes)))
     # endregion
+
+
+if not hurwitzint.UNITS:
+    def units() -> list["hurwitzint"]:
+        """All the unit directions from the origin"""
+        # ±1, ±i, ±j, ±k, and (±1±i±j±k)/2 (16 of them).
+        out: list[hurwitzint] = []
+
+        one = hurwitzint(1, 0, 0, 0)
+        i = hurwitzint(0, 1, 0, 0)
+        j = hurwitzint(0, 0, 1, 0)
+        k = hurwitzint(0, 0, 0, 1)
+
+        for s in (-1, 1):
+            out.extend([s * one, s * i, s * j, s * k])
+
+        # 16 half-units
+        out.extend([
+            hurwitzint(a, b, c, d, half=True)
+            for a in (-1, 1)
+            for b in (-1, 1)
+            for c in (-1, 1)
+            for d in (-1, 1)
+        ])
+
+        # Optional:
+        out.sort(key=lambda u: u.components2())
+        return out
+
+    hurwitzint.UNITS = units()
 
 
 def rdivmod(a: "hurwitzint", b: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
