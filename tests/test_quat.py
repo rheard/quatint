@@ -6,7 +6,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import hurwitzint, prod_left, prod_right
+from quatint.quat import hurwitzint, rdivmod
 
 def test_compiled_tests():
     """Verify that we are running these tests with a compiled version of hurwitzint"""
@@ -209,6 +209,26 @@ class TestDiv(HurwitzIntTests):
         self.assert_equal(res_q, res_int_q)
         self.assert_equal(res_r, res_int_r)
 
+    def test_wide_search(self):
+        """Test many different hurwitzint division operations"""
+        a_max = 7
+        b_max = 3
+
+        for a1 in range(1, a_max):
+            for b1 in range(1, a_max):
+                for c1 in range(1, a_max):
+                    for d1 in range(1, a_max):
+                        for a2 in range(1, b_max):
+                            for b2 in range(1, b_max):
+                                for c2 in range(1, b_max):
+                                    for d2 in range(1, b_max):
+                                        a = hurwitzint(a1, b1, c1, d1)
+                                        b = hurwitzint(a2, b2, c2, d2)
+
+                                        res_q, res_r = divmod(a, b)
+
+                                        assert res_q * b + res_r == a
+
 
 class TestRDiv(HurwitzIntTests):
     """Tests for rtruediv and rfloordiv"""
@@ -223,6 +243,26 @@ class TestRDiv(HurwitzIntTests):
         q, r = a.rdivmod(g)
         assert not r
         assert g * q == a
+
+    def test_wide_search(self):
+        """Test many different hurwitzint right-division operations"""
+        a_max = 7
+        b_max = 3
+
+        for a1 in range(1, a_max):
+            for b1 in range(1, a_max):
+                for c1 in range(1, a_max):
+                    for d1 in range(1, a_max):
+                        for a2 in range(1, b_max):
+                            for b2 in range(1, b_max):
+                                for c2 in range(1, b_max):
+                                    for d2 in range(1, b_max):
+                                        a = hurwitzint(a1, b1, c1, d1)
+                                        b = hurwitzint(a2, b2, c2, d2)
+
+                                        res_q, res_r = rdivmod(a, b)
+
+                                        assert b * res_q + res_r == a
 
 
 class TestGcdLeft(HurwitzIntTests):
