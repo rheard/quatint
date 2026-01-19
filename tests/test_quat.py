@@ -348,6 +348,12 @@ class TestFactorRight(HurwitzIntTests):
 
         self.assert_equal(self.b_int, ans)
 
+    def test_examples(self):
+        """Validate factor works as expected for some given examples."""
+        n = hurwitzint(2, 3, 4, 53)
+        factors = n.factor_right()
+        assert n == factors.prod_right()
+
 
 class TestFactorLeft(HurwitzIntTests):
     """Tests for factor_left"""

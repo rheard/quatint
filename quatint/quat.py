@@ -819,8 +819,7 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        unit = hurwitzint._normalize_unit(q)
-        return HurwitzFactorization(content=m, unit=unit, primes=tuple(reversed(primes)))
+        return HurwitzFactorization(content=m, unit=q, primes=tuple(reversed(primes)))
 
     def factor_left(self) -> HurwitzFactorization:
         """
@@ -875,8 +874,7 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        unit = hurwitzint._normalize_unit(q)
-        return HurwitzFactorization(content=m, unit=unit, primes=tuple(reversed(primes)))
+        return HurwitzFactorization(content=m, unit=q, primes=tuple(reversed(primes)))
     # endregion
 
 
