@@ -329,8 +329,11 @@ class hurwitzint:
             """
             Return (Q, metric) minimizing (Q*n - U)^2 subject to Q % 2 == parity,
             given a nearby integer Q0 ~ U/n.
+
+            Returns:
+                tuple: The (Q, metric).
             """
-            if (Q0 & 1) == parity:
+            if parity == (Q0 & 1):
                 d = Q0 * n - U
                 return Q0, d * d
 
@@ -355,15 +358,11 @@ class hurwitzint:
             return A, B, C, D, (mA + mB + mC + mD)
 
         # Compare best all-even vs best all-odd.
-        A_e, B_e, C_e, D_e, M_e = build_candidate(0)
-        A_o, B_o, C_o, D_o, M_o = build_candidate(1)
+        *e, M_e = build_candidate(0)
+        *o, M_o = build_candidate(1)
 
         # Deterministic tie-break if equal metric: prefer even.
-        if M_e <= M_o:
-            q = self._make(A_e, B_e, C_e, D_e)
-        else:
-            q = self._make(A_o, B_o, C_o, D_o)
-
+        q = self._make(*e) if M_e <= M_o else self._make(*o)
         r = remainder(self, q, divisor)
         return q, r
 
