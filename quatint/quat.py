@@ -519,7 +519,7 @@ class hurwitzint:
         def _imag_term(coeff: int, sym: str) -> str:
             sign = "+" if coeff >= 0 else "-"
             mag = -coeff if coeff < 0 else coeff
-            mag_str = "" if mag == 1 else str(mag) # 1i -> i
+            mag_str = "" if mag == 1 else str(mag)  # 1i -> i
             return f"{sign}{mag_str}{sym}"
 
         core = f"({ra}{_imag_term(rb, 'i')}{_imag_term(rc, 'j')}{_imag_term(rd, 'k')})"
