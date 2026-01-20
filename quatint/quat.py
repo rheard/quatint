@@ -296,6 +296,12 @@ class hurwitzint:
         """
         A shared division algorithm.
 
+        Chooses q in the Hurwitz parity lattice (all components same parity) minimizing
+            sum_i (Qi*n - Ui)^2
+        where U = (num.a,num.b,num.c,num.d) and n = divisor_norm.
+
+        This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
+
         Args:
             num: The number to divide.
             divisor: The divisor.
@@ -305,48 +311,59 @@ class hurwitzint:
         Returns:
             tuple: The quotient and remainder.
         """
+        n = divisor_norm
 
-        # We want q ≈ num / n, but everything is stored in numerator-units (../2).
-        # If num is stored as (U)/2, and we want q stored as (Q)/2, then Q ≈ U / n.
-        A0 = _round_div_ties_away_from_zero(num.a, divisor_norm)
-        B0 = _round_div_ties_away_from_zero(num.b, divisor_norm)
-        C0 = _round_div_ties_away_from_zero(num.c, divisor_norm)
-        D0 = _round_div_ties_away_from_zero(num.d, divisor_norm)
+        # Unconstrained nearest integers to U_i / n (ties away from zero, matching your current behavior).
+        A0 = _round_div_ties_away_from_zero(num.a, n)
+        B0 = _round_div_ties_away_from_zero(num.b, n)
+        C0 = _round_div_ties_away_from_zero(num.c, n)
+        D0 = _round_div_ties_away_from_zero(num.d, n)
 
-        # Choose best among a small neighborhood under Euclidean metric in R^4,
-        # but restricted to Hurwitz parity lattice: all components same parity.
-        bestA, bestB, bestC, bestD = A0, B0, C0, D0
-        best_metric: Optional[int] = None
+        # Fast path: already in the Hurwitz parity lattice.
+        if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
+            q = self._make(A0, B0, C0, D0)
+            r = remainder(self, q, divisor)
+            return q, r
 
-        # metric is scaled distance:
-        # sum_i (Qi*n - Ui)^2   (scale by n^2 doesn't matter for argmin)
-        for A in (A0 - 1, A0, A0 + 1):
-            for B in (B0 - 1, B0, B0 + 1):
-                if ((A ^ B) & 1) != 0:
-                    continue
-                dA = A * divisor_norm - num.a
-                dB = B * divisor_norm - num.b
-                dA2 = dA * dA
-                dB2 = dB * dB
+        def best_with_parity(U: int, Q0: int, parity: int) -> tuple[int, int]:
+            """
+            Return (Q, metric) minimizing (Q*n - U)^2 subject to Q % 2 == parity,
+            given a nearby integer Q0 ~ U/n.
+            """
+            if (Q0 & 1) == parity:
+                d = Q0 * n - U
+                return Q0, d * d
 
-                for C in (C0 - 1, C0, C0 + 1):
-                    if ((A ^ C) & 1) != 0:
-                        continue
-                    dC = C * divisor_norm - num.c
-                    dC2 = dC * dC
+            # Nearest integer with opposite parity must be Q0-1 or Q0+1.
+            Qm = Q0 - 1
+            Qp = Q0 + 1
+            dm = Qm * n - U
+            dp = Qp * n - U
+            mm = dm * dm
+            mp = dp * dp
 
-                    for D in (D0 - 1, D0, D0 + 1):
-                        if ((A ^ D) & 1) != 0:
-                            continue
+            # Deterministic tie-break: prefer the smaller Q (Qm) on equal metric.
+            if mm <= mp:
+                return Qm, mm
+            return Qp, mp
 
-                        dD = D * divisor_norm - num.d
-                        metric = dA2 + dB2 + dC2 + (dD * dD)
+        def build_candidate(parity: int) -> tuple[int, int, int, int, int]:
+            A, mA = best_with_parity(num.a, A0, parity)
+            B, mB = best_with_parity(num.b, B0, parity)
+            C, mC = best_with_parity(num.c, C0, parity)
+            D, mD = best_with_parity(num.d, D0, parity)
+            return A, B, C, D, (mA + mB + mC + mD)
 
-                        if best_metric is None or metric < best_metric:
-                            best_metric = metric
-                            bestA, bestB, bestC, bestD = A, B, C, D
+        # Compare best all-even vs best all-odd.
+        A_e, B_e, C_e, D_e, M_e = build_candidate(0)
+        A_o, B_o, C_o, D_o, M_o = build_candidate(1)
 
-        q = self._make(bestA, bestB, bestC, bestD)
+        # Deterministic tie-break if equal metric: prefer even.
+        if M_e <= M_o:
+            q = self._make(A_e, B_e, C_e, D_e)
+        else:
+            q = self._make(A_o, B_o, C_o, D_o)
+
         r = remainder(self, q, divisor)
         return q, r
 
