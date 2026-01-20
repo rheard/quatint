@@ -6,7 +6,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import hurwitzint, rdivmod
+from quatint.quat import HurwitzFactorization, hurwitzint, rdivmod
 
 def test_compiled_tests():
     """Verify that we are running these tests with a compiled version of hurwitzint"""
@@ -382,17 +382,26 @@ class TestFactorRight(HurwitzIntTests):
 
     def test_main(self):
         """Validate factor works as expected."""
-        factors = self.b_int.factor_right()
-
-        ans = factors.prod_right()
-
-        self.assert_equal(self.b_int, ans)
+        self.assert_factoring(self.b_int, self.b_int.factor_right())
 
     def test_examples(self):
         """Validate factor works as expected for some given examples."""
         n = hurwitzint(2, 3, 4, 53)
-        factors = n.factor_right()
-        assert n == factors.prod_right()
+        self.assert_factoring(n, n.factor_right())
+
+    def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):
+        """Validate everything about the factoring is correct"""
+        ans = factors.prod_right()
+
+        self.assert_equal(n, ans)
+
+        for p in factors.primes:
+            # These _should_ all be primes and should be impossible to factor...
+            prime_factors = p.factor_right()
+
+            assert prime_factors.content == 1
+            assert prime_factors.unit == hurwitzint(1, 0, 0, 0)
+            assert prime_factors.primes == (p, )
 
 
 class TestFactorLeft(HurwitzIntTests):
@@ -400,17 +409,26 @@ class TestFactorLeft(HurwitzIntTests):
 
     def test_main(self):
         """Validate factor works as expected."""
-        factors = self.b_int.factor_left()
-
-        ans = factors.prod_left()
-
-        self.assert_equal(self.b_int, ans)
+        self.assert_factoring(self.b_int, self.b_int.factor_left())
 
     def test_examples(self):
         """Validate factor works as expected for some given examples."""
         n = hurwitzint(2, 3, 4, 53)
-        factors = n.factor_left()
-        assert n == factors.prod_left()
+        self.assert_factoring(n, n.factor_left())
+
+    def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):
+        """Validate everything about the factoring is correct"""
+        ans = factors.prod_left()
+
+        self.assert_equal(n, ans)
+
+        for p in factors.primes:
+            # These _should_ all be primes and should be impossible to factor...
+            prime_factors = p.factor_left()
+
+            assert prime_factors.content == 1
+            assert prime_factors.unit == hurwitzint(1, 0, 0, 0)
+            assert prime_factors.primes == (p, )
 
 
 class TestRepr(HurwitzIntTests):
