@@ -813,7 +813,7 @@ class hurwitzint:
         g_canon, _ = g._canonical_associate(direction="left")
         return g_canon
 
-    def factor_right(self) -> HurwitzFactorization:
+    def factor_right(self, *, canonical: bool = True) -> HurwitzFactorization:
         """
         Deterministic right factorization normal form (primitive-first).
 
@@ -870,12 +870,17 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        return self._canonicalize_norm(HurwitzFactorization(content=m,
+        factors = HurwitzFactorization(content=m,
                                        unit=q,
                                        primes=tuple(reversed(primes)),
-                                       direction="right"))
+                                       direction="right")
 
-    def factor_left(self) -> HurwitzFactorization:
+        if canonical:
+            return self._canonicalize_norm(factors)
+
+        return factors
+
+    def factor_left(self, *, canonical: bool = True) -> HurwitzFactorization:
         """
         Deterministic left factorization normal form.
 
@@ -928,10 +933,15 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        return self._canonicalize_norm(HurwitzFactorization(content=m,
+        factors = HurwitzFactorization(content=m,
                                        unit=q,
                                        primes=tuple(reversed(primes)),
-                                       direction="left"))
+                                       direction="left")
+
+        if canonical:
+            return self._canonicalize_norm(factors)
+
+        return factors
     # endregion
 
 
