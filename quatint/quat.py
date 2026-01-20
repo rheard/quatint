@@ -745,6 +745,7 @@ class hurwitzint:
         if abs(self) == abs(q):
             raise ValueError("metacommutation requires distinct rational norms")
 
+        divmod_method: Callable
         if direction == "right":
             pq = self * q
             divmod_method = rdivmod
