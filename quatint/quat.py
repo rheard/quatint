@@ -711,10 +711,12 @@ class hurwitzint:
             HurwitzFactorization: The canonicalized factorization.
         """
         primes = list(factors.primes)
+        norms = [abs(p) for p in primes]
         i = 0
         while i < len(primes) - 1:
-            if abs(primes[i]) > abs(primes[i + 1]):
+            if norms[i] > norms[i + 1]:
                 primes[i], primes[i + 1] = primes[i]._metacommutate_pair(primes[i + 1], factors.direction)
+                norms[i], norms[i + 1] = norms[i + 1], norms[i]
                 if i:
                     i -= 1  # bubble backward
             else:
