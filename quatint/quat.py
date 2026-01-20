@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cache
 from math import gcd, prod
-from typing import Callable, ClassVar, Iterable, Iterator, Optional, Union
+from typing import Callable, ClassVar, Iterable, Iterator, Literal, Optional, Union
 
 from sympy import factorint
 
@@ -26,6 +26,13 @@ class HurwitzFactorization:
     content: int
     unit: "hurwitzint"
     primes: tuple["hurwitzint", ...]
+    direction: Literal["left", "right"]
+
+    def prod(self):
+        """Recreate the number using prod_right or prod_left"""
+        if self.direction == "right":
+            return self.prod_right()
+        return self.prod_left()
 
     def prod_right(self):
         """Recreate the number using prod_right"""
@@ -614,46 +621,6 @@ class hurwitzint:
     # endregion
 
     # region Factoring
-    def _canonical_left_associate(self) -> tuple["hurwitzint", "hurwitzint"]:
-        """
-        Unit-migration normalization for a *right* factor:
-            replace p by u*p (u a unit) to get a canonical representative.
-
-        Returns:
-             tuple: (p_canon, u) such that p_canon = u*p.
-        """
-        best = None
-        best_u = None
-        for u in hurwitzint.UNITS:
-            cand = u * self
-            key = cand.components2()
-            if best is None or key < best:
-                best = key
-                best_u = u
-
-        assert best_u is not None
-        return best_u * self, best_u
-
-    def _canonical_right_associate(self) -> tuple["hurwitzint", "hurwitzint"]:
-        """
-        Unit-migration normalization for a *left* factor:
-            replace p by p*u (u a unit).
-
-        Returns:
-             tuple: (p_canon, u) such that p_canon = p*u.
-        """
-        best = None
-        best_u = None
-        for u in hurwitzint.UNITS:
-            cand = self * u
-            key = cand.components2()
-            if best is None or key < best:
-                best = key
-                best_u = u
-
-        assert best_u is not None
-        return self * best_u, best_u
-
     def content(self) -> int:
         """
         Largest positive integer m such that self = m*q' with q' still a Hurwitz integer.
@@ -729,8 +696,116 @@ class hurwitzint:
             raise ArithmeticError("prime construction failed: gcd did not have norm p")
 
         # Canonicalize base up to left associates (unit migration friendly for right factoring)
-        base_canon, _ = base._canonical_left_associate()
+        base_canon, _ = base._canonical_associate(direction="left")
         return base_canon
+
+    @staticmethod
+    def _canonicalize_norm(factors: "HurwitzFactorization") -> "HurwitzFactorization":
+        """
+        Canonicalize the prime list by sorting primes by rational norm using metacommutation swaps.
+
+        This is exactly the step needed if we want a stable canonical ordering of prime factors
+            in a non-commutative setting.
+
+        Returns:
+            HurwitzFactorization: The canonicalized factorization.
+        """
+        primes = list(factors.primes)
+        i = 0
+        while i < len(primes) - 1:
+            if abs(primes[i]) > abs(primes[i + 1]):
+                primes[i], primes[i + 1] = primes[i]._metacommutate_pair(primes[i + 1], factors.direction)
+                if i:
+                    i -= 1  # bubble backward
+            else:
+                i += 1
+
+        return HurwitzFactorization(content=factors.content,
+                                    unit=factors.unit,
+                                    primes=tuple(primes),
+                                    direction=factors.direction)
+
+    def _metacommutate_pair(self,
+                            q: "hurwitzint",
+                            direction: Literal["left", "right"]) -> tuple["hurwitzint", "hurwitzint"]:
+        """
+        Metacommutation step for adjacent primes of *distinct* rational norms.
+
+        Given p, q (typically Hurwitz primes) with abs(p) != abs(q), find p2, q2 such that:
+            p * q == q2 * p2
+
+        Returns:
+            (q2, p2)  # i.e. swapped pair, adjusted by associates so the product is preserved.
+
+        Raises:
+            ArithmeticError: if no metacommutation swap is found
+                (should not happen for genuine primes of distinct norms).
+            ValueError: Failed to metacommutate pair due to poor input?
+        """
+        if abs(self) == abs(q):
+            raise ValueError("metacommutation requires distinct rational norms")
+
+        if direction == "right":
+            pq = self * q
+            divmod_method = rdivmod
+        else:
+            pq = q * self
+            divmod_method = divmod
+
+        best_key = None
+        best_q = None
+        best_p = None
+
+        # Search associates of q: uL * q * uR, try to left-divide pq by that candidate
+        for uL in hurwitzint.UNITS:
+            for uR in hurwitzint.UNITS:
+                cand_q = uL * q * uR
+                cand_p, r = divmod_method(pq, cand_q)   # pq = cand_q * cand_p + r
+
+                if r:
+                    continue
+                if abs(cand_p) != abs(self):
+                    continue
+
+                key = (cand_q.components2(), cand_p.components2())
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best_q = cand_q
+                    best_p = cand_p
+
+        if best_q is None or best_p is None:
+            raise ArithmeticError("metacommutation failed to find a swap")
+
+        # Canonicalize the LEFT factor by right-associate normalization, and migrate the unit across the boundary:
+        #   (best_q * u) * (u^{-1} * best_p) == best_q * best_p
+        q_canon, u = best_q._canonical_associate(direction)
+
+        # u^{-1} == conjugate(u) for units
+        p_adj = u.conjugate() * best_p if direction == "right" else best_p * u.conjugate()
+
+        return q_canon, p_adj
+
+    def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple["hurwitzint", "hurwitzint"]:
+        """
+        Unit-migration normalization for a *left* factor:
+            replace p by p*u (u a unit).
+
+        Returns:
+             tuple: (p_canon, u) such that p_canon = p*u.
+        """
+        best = None
+        best_u = None
+        for u in hurwitzint.UNITS:
+            cand = self * u if direction == "right" else u * self
+            key = cand.components2()
+            if best is None or key < best:
+                best = key
+                best_u = u
+
+        assert best_u is not None
+        if direction == "right":
+            return self * best_u, best_u
+        return best_u * self, best_u
 
     def _extract_right_prime(self, p: int) -> "hurwitzint":
         """
@@ -750,7 +825,7 @@ class hurwitzint:
         if abs(g) != p:
             raise ArithmeticError(f"Failed to extract right prime for {p=}")
 
-        g_canon, _ = g._canonical_left_associate()
+        g_canon, _ = g._canonical_associate(direction="left")
         return g_canon
 
     def factor_right(self) -> HurwitzFactorization:
@@ -772,7 +847,10 @@ class hurwitzint:
             ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
         if not self:
-            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=())
+            return HurwitzFactorization(content=0,
+                                        unit=hurwitzint(1, 0, 0, 0),
+                                        primes=(),
+                                        direction="right")
 
         # Extract integer content
         m = self.content()
@@ -807,7 +885,10 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        return HurwitzFactorization(content=m, unit=q, primes=tuple(reversed(primes)))
+        return self._canonicalize_norm(HurwitzFactorization(content=m,
+                                       unit=q,
+                                       primes=tuple(reversed(primes)),
+                                       direction="right"))
 
     def factor_left(self) -> HurwitzFactorization:
         """
@@ -825,7 +906,7 @@ class hurwitzint:
             ArithmeticError: If there is a problem preventing factoring.
         """
         if not self:
-            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=())
+            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction="left")
 
         m = self.content()
         if m < 0:
@@ -850,7 +931,7 @@ class hurwitzint:
                 pi_r = q.conjugate()._extract_right_prime(p).conjugate()
 
                 # Normalize for left-factorization by right-multiplying a unit: pi = pi_r * u
-                pi, _ = pi_r._canonical_right_associate()
+                pi, _ = pi_r._canonical_associate(direction="right")
 
                 # Divide on the left: q = pi * qq
                 qq, rr = q.rdivmod(pi)
@@ -862,7 +943,10 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        return HurwitzFactorization(content=m, unit=q, primes=tuple(reversed(primes)))
+        return self._canonicalize_norm(HurwitzFactorization(content=m,
+                                       unit=q,
+                                       primes=tuple(reversed(primes)),
+                                       direction="left"))
     # endregion
 
 

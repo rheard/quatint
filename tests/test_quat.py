@@ -389,19 +389,32 @@ class TestFactorRight(HurwitzIntTests):
         n = hurwitzint(2, 3, 4, 53)
         self.assert_factoring(n, n.factor_right())
 
+        # This fails to have a norm-sorted prime factorization if metacommutation has not been implimented
+        n = hurwitzint(1, 1, 1, 6)
+        self.assert_factoring(n, n.factor_right())
+
     def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):
         """Validate everything about the factoring is correct"""
-        ans = factors.prod_right()
+        ans = factors.prod()
 
         self.assert_equal(n, ans)
+
+        # Validate metacommutation by verifying the norms are sorted
+        norms = [abs(p) for p in factors.primes]
+        assert norms == sorted(norms)
 
         for p in factors.primes:
             # These _should_ all be primes and should be impossible to factor...
             prime_factors = p.factor_right()
 
             assert prime_factors.content == 1
-            assert prime_factors.unit == hurwitzint(1, 0, 0, 0)
-            assert prime_factors.primes == (p, )
+            assert abs(prime_factors.unit) == 1
+            assert len(prime_factors.primes) == 1
+            assert abs(prime_factors.primes[0]) == abs(p)
+
+            q, r = divmod(p, prime_factors.primes[0])
+            assert not r
+            assert abs(q) == 1
 
 
 class TestFactorLeft(HurwitzIntTests):
@@ -416,19 +429,32 @@ class TestFactorLeft(HurwitzIntTests):
         n = hurwitzint(2, 3, 4, 53)
         self.assert_factoring(n, n.factor_left())
 
+        # This fails to have a norm-sorted prime factorization if metacommutation has not been implimented
+        n = hurwitzint(1, 1, 1, 6)
+        self.assert_factoring(n, n.factor_left())
+
     def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):
         """Validate everything about the factoring is correct"""
-        ans = factors.prod_left()
+        ans = factors.prod()
 
         self.assert_equal(n, ans)
+
+        # Validate metacommutation by verifying the norms are sorted
+        norms = [abs(p) for p in factors.primes]
+        assert norms == sorted(norms)
 
         for p in factors.primes:
             # These _should_ all be primes and should be impossible to factor...
             prime_factors = p.factor_left()
 
             assert prime_factors.content == 1
-            assert prime_factors.unit == hurwitzint(1, 0, 0, 0)
-            assert prime_factors.primes == (p, )
+            assert abs(prime_factors.unit) == 1
+            assert len(prime_factors.primes) == 1
+            assert abs(prime_factors.primes[0]) == abs(p)
+
+            q, r = rdivmod(p, prime_factors.primes[0])
+            assert not r
+            assert abs(q) == 1
 
 
 class TestRepr(HurwitzIntTests):
