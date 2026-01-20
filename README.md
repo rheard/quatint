@@ -146,4 +146,4 @@ This means:
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
 * `a.factor_left()` / `a.factor_right()` → `HurwitzFactorization`
-* `HurwitzFactorization.prod_left()` / `.prod_right()`
+* `HurwitzFactorization.prod_left()` / `.prod_right()` / `.prod()`
