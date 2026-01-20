@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade mypy
-          stubgen quatint/__init__.py
+          stubgen quatint/__init__.py --inspect-mode
           stubgen quatint/quat.py
           mkdir -p quatint-stubs
           mv out/quatint/__init__.pyi quatint-stubs/__init__.pyi
