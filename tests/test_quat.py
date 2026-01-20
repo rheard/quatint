@@ -393,6 +393,10 @@ class TestFactorRight(HurwitzIntTests):
         n = hurwitzint(1, 1, 1, 6)
         self.assert_factoring(n, n.factor_right())
 
+        # This fails to factor after metacommutation was implemented due to a failed metacommutation swap. Fix it!
+        n = hurwitzint(1, 1, 2, 15)
+        self.assert_factoring(n, n.factor_left())
+
     def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):
         """Validate everything about the factoring is correct"""
         ans = factors.prod()
@@ -431,6 +435,10 @@ class TestFactorLeft(HurwitzIntTests):
 
         # This fails to have a norm-sorted prime factorization if metacommutation has not been implimented
         n = hurwitzint(1, 1, 1, 6)
+        self.assert_factoring(n, n.factor_left())
+
+        # This fails to factor after metacommutation was implemented due to a failed metacommutation swap. Fix it!
+        n = hurwitzint(1, 1, 2, 15)
         self.assert_factoring(n, n.factor_left())
 
     def assert_factoring(self, n: hurwitzint, factors: HurwitzFactorization):

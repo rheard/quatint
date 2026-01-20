@@ -745,45 +745,29 @@ class hurwitzint:
         if abs(self) == abs(q):
             raise ValueError("metacommutation requires distinct rational norms")
 
-        divmod_method: Callable
+        qnorm = abs(q)
+        scalar = hurwitzint(qnorm, 0, 0, 0)
+
         if direction == "right":
+            # local product is self * q; want self*q = q2 * p2  (q2 left-divides)
             pq = self * q
-            divmod_method = rdivmod
+            best_q = pq.gcd_left(scalar, normalize=False)
+            best_p, r = pq.rdivmod(best_q)   # pq = best_q * best_p + r
         else:
+            # local product is q * self (because prod_left reverses); want q*self = p2 * q2  (q2 right-divides)
             pq = q * self
-            divmod_method = divmod
+            best_q = pq.gcd_right(scalar, normalize=False)
+            best_p, r = divmod(pq, best_q)   # pq = best_p * best_q + r
 
-        best_key = None
-        best_q = None
-        best_p = None
+        if r:
+            raise ArithmeticError("metacommutation swap produced remainder (unexpected)")
 
-        # Search associates of q: uL * q * uR, try to left-divide pq by that candidate
-        for uL in hurwitzint.UNITS:
-            for uR in hurwitzint.UNITS:
-                cand_q = uL * q * uR
-                cand_p, r = divmod_method(pq, cand_q)   # pq = cand_q * cand_p + r
+        if abs(best_q) != qnorm or abs(best_p) != abs(self):
+            raise ArithmeticError("metacommutation swap produced wrong norms (unexpected)")
 
-                if r:
-                    continue
-                if abs(cand_p) != abs(self):
-                    continue
-
-                key = (cand_q.components2(), cand_p.components2())
-                if best_key is None or key < best_key:
-                    best_key = key
-                    best_q = cand_q
-                    best_p = cand_p
-
-        if best_q is None or best_p is None:
-            raise ArithmeticError("metacommutation failed to find a swap")
-
-        # Canonicalize the LEFT factor by right-associate normalization, and migrate the unit across the boundary:
-        #   (best_q * u) * (u^{-1} * best_p) == best_q * best_p
+        # Canonicalize the LEFT factor in *list order*, and migrate the unit across the boundary
         q_canon, u = best_q._canonical_associate(direction)
-
-        # u^{-1} == conjugate(u) for units
         p_adj = u.conjugate() * best_p if direction == "right" else best_p * u.conjugate()
-
         return q_canon, p_adj
 
     def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple["hurwitzint", "hurwitzint"]:
