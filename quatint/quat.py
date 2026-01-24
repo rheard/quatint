@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from functools import cache
 from math import gcd, prod
-from typing import Callable, ClassVar, Iterable, Iterator, Literal, Optional, Union
+from typing import Callable, ClassVar, Generator, Iterable, Iterator, Literal, Optional, Union
 
 from sympy import factorint
+
+from quatint.utils import cache_generator
 
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
@@ -53,6 +55,32 @@ def _round_div_ties_away_from_zero(a: int, b: int) -> int:
 
     # a < 0
     return -((-a + (b // 2)) // b)
+
+
+@cache_generator
+def uv_for_prime(p: int) -> Generator[tuple[int, int], None, None]:
+    """
+    Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
+        Deterministic search over u with Tonelli sqrt for v.
+
+    Yields:
+        tuple: The found u,v where 1 + u^2 + v^2 ≡ 0 (mod p).
+
+    Raises:
+        ArithmeticError: If we fail to find a good u,v pair.
+    """
+    p = int(p)
+    if p == 2:
+        yield 0, 1
+        return
+
+    for u in range(p):
+        t = (-1 - (u * u)) % p
+        v = mod_sqrt_prime(t, p)
+        if v is not None:
+            yield u, v
+
+    raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
 
 
 def mod_sqrt_prime(n: int, p: int) -> Optional[int]:
@@ -590,7 +618,7 @@ class hurwitzint:
             return b._normalize_unit() if normalize else b
 
         if b:
-            last = abs(b)
+            # last = abs(b)
             while b:
                 _, r = divmod_method(a, b)
                 a, b = b, r
@@ -662,31 +690,6 @@ class hurwitzint:
 
     @staticmethod
     @cache
-    def _find_uv_for_prime(p: int) -> tuple[int, int]:
-        """
-        Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
-            Deterministic search over u with Tonelli sqrt for v.
-
-        Returns:
-            tuple: The found u,v where 1 + u^2 + v^2 ≡ 0 (mod p).
-
-        Raises:
-            ArithmeticError: If we fail to find a good u,v pair.
-        """
-        p = int(p)
-        if p == 2:
-            return 0, 1
-
-        for u in range(p):
-            t = (-1 - (u * u)) % p
-            v = mod_sqrt_prime(t, p)
-            if v is not None:
-                return u, v
-
-        raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
-
-    @staticmethod
-    @cache
     def _prime_over_rational(p: int) -> "hurwitzint":
         """
         Build a deterministic Hurwitz prime with norm p by Euclid from (p, 1+ui+vj).
@@ -704,7 +707,7 @@ class hurwitzint:
             # A simple norm-2 prime
             base = hurwitzint(1, 1, 0, 0)  # norm 2
         else:
-            u, v = hurwitzint._find_uv_for_prime(p)
+            u, v = next(iter(uv_for_prime(p)))
             q = hurwitzint(1, u, v, 0)  # Lipschitz element in H(Z)
             base = hurwitzint.gcd_right(hurwitzint(p, 0, 0, 0), q)
 
