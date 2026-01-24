@@ -34,9 +34,11 @@ jobs:
           python -m pip install --upgrade mypy "sympy<=1.12.1"
           stubgen quatint/__init__.py --inspect-mode
           stubgen quatint/quat.py
+          stubgen quatint/utils.py
           mkdir -p quatint-stubs
           mv out/quatint/__init__.pyi quatint-stubs/__init__.pyi
           mv out/quatint/quat.pyi quatint-stubs/quat.pyi
+          mv out/quatint/utils.pyi quatint-stubs/utils.pyi
           rm -rf out
 
       - name: Install dependencies

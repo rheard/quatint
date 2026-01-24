@@ -16,6 +16,7 @@ setup(
     ext_modules=mypycify([
         "quatint/__init__.py",
         "quatint/quat.py",
+        "quatint/utils.py",
     ]),
 
     license="MIT",
