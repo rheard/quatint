@@ -80,8 +80,9 @@ def uv_for_prime(p: int) -> Generator[tuple[int, int], None, None]:
         if v is not None:
             yield u, v
 
+    raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
 
-@cache
+
 def mod_sqrt_prime(n: int, p: int) -> Optional[int]:
     """Return x such that x*x % p == n % p, or None if no sqrt exists. p must be prime."""
     n %= p
