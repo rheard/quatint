@@ -1,6 +1,10 @@
+import os
+
 from math import isqrt
 from pathlib import Path
 from typing import Union
+
+import pytest
 
 from hurwitz import HurwitzQuaternion
 
@@ -8,6 +12,8 @@ import quatint.quat
 
 from quatint.quat import HurwitzFactorization, hurwitzint, rdivmod
 
+@pytest.mark.skipif(os.getenv("CI", "").lower() not in {"1", "true", "yes"},
+                    reason="Compiled-only test")
 def test_compiled_tests():
     """Verify that we are running these tests with a compiled version of hurwitzint"""
     path = Path(quatint.quat.__file__)

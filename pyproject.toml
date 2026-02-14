@@ -56,6 +56,9 @@ test-command=[
     'rm -rf "{project}/temp"',
 ]
 
+[tool.cibuildwheel.linux]
+environment-pass = ["CI", "GITHUB_ACTIONS"]
+
 [tool.ruff]
 line-length = 120
 extend-exclude=["quatint-stubs"]
