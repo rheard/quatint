@@ -62,7 +62,7 @@ def cache_generator(
         with cache_lock:
             entry = cache.get(key)
             if entry is None:
-                entry = _GenCacheEntry(cast(Generator[Any, None, None], fn(*args, **kwargs)))
+                entry = _GenCacheEntry(cast("Generator[Any, None, None]", fn(*args, **kwargs)))
                 cache[key] = entry
 
         def _iter() -> Generator[T, None, None]:
