@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+# TODO: Move this to a proper package? Maybe join with splitcache into an infcache library for infinite caches?
+
 from functools import wraps
 from threading import RLock
-from typing import Any, Callable, Generator, Generic, Hashable, Optional, TypeVar, cast
+from typing import Any, Callable, Generator, Hashable, Optional, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -10,9 +11,8 @@ _KW_MARKER = object()
 
 
 class _GenCacheEntry:
-    """
-    mypyc-friendly cache entry container (avoid @dataclass).
-    """
+    """mypyc-friendly cache entry container (avoid @dataclass)"""
+
     __slots__ = ("lock", "items", "gen", "done", "exc")
 
     def __init__(self, gen: Generator[Any, None, None]) -> None:
@@ -114,7 +114,7 @@ def cache_generator(
                         entry.items.append(nxt)
                         i += 1  # we are about to yield this new cached item
 
-                yield cast(T, nxt)
+                yield cast("T", nxt)
 
         return _iter()
 
