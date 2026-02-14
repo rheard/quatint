@@ -37,12 +37,12 @@ This project is designed to compile cleanly with **mypyc** for speed (CI/test se
 ```python
 from quatint import hurwitzint
 
-a = hurwitzint(1, 2, 3, 4)
+a = hurwitzint(1, 1, 1, 1)
 b = hurwitzint(2, 3, 4, 5)
 
-print(a)         # (1+2i+3j+4k)
-print(a * b)     # quaternion product (non-commutative)
-print(b * a)     # generally different
+print(a)         # (1+i+j+k)
+print(a * b)     # (-10+6i+4j+8k)
+print(b * a)     # (-10+4i+8j+6k)
 ```
 
 ### Half-integers (Hurwitz elements)
