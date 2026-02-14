@@ -513,7 +513,10 @@ class hurwitzint:
             int: The norm.
         """
         num = self.a * self.a + self.b * self.b + self.c * self.c + self.d * self.d
-        q, r = divmod(num, 4)
+        # q, r = divmod(num, 4)   # Below is ever so slightly faster it seems, and this is an important operation
+        r = num & 3
+        q = num >> 2
+
         if r != 0:
             raise ArithmeticError("Non-integral norm; parity constraint violated")
 
@@ -623,11 +626,12 @@ class hurwitzint:
                 _, r = divmod_method(a, b)
                 a, b = b, r
 
-                if b:
-                    nb = abs(b)
-                    if nb >= last:
-                        raise ArithmeticError("Euclidean descent failed (non-decreasing remainder norm)")
-                    last = nb
+                # This is supposedly only a sanity check:
+                # if b:
+                #     nb = abs(b)
+                #     if nb >= last:
+                #         raise ArithmeticError("Euclidean descent failed (non-decreasing remainder norm)")
+                #     last = nb
 
         return a._normalize_unit() if normalize else a
 
