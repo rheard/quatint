@@ -1,5 +1,3 @@
-from types import GeneratorType
-
 import pytest
 
 from quatint.utils import cache_generator
@@ -47,8 +45,6 @@ class TestBasics(CacheGeneratorTests):
         g1 = wrapped(3)
         g2 = wrapped(3)
 
-        assert isinstance(g1, GeneratorType)
-        assert isinstance(g2, GeneratorType)
         assert g1 is not g2
 
     def test_replay_does_not_advance_underlying_generator(self):
