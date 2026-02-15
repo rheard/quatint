@@ -4,7 +4,6 @@ import pytest
 
 from quatint.utils import cache_generator
 
-
 class CacheGeneratorTests:
     """Support methods and state for cache_generator tests."""
 

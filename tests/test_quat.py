@@ -480,6 +480,7 @@ class TestRepr(HurwitzIntTests):
         assert repr(hurwitzint(1, 2, 3, 4)) == "(1+2i+3j+4k)"
         assert repr(hurwitzint(1, 3, 5, 7, half=True)) == "(1+3i+5j+7k)/2"
         assert repr(hurwitzint(0, 0, 0, 5)) == "5k"
+        assert repr(hurwitzint(0, 0, 0, -5)) == "-5k"
         assert repr(hurwitzint(2, 0, 0, 0)) == "(2+0i+0j+0k)"
         assert repr(hurwitzint(1, 1, 1, 1)) == "(1+i+j+k)"
         assert repr(hurwitzint(-1, -1, -1, -1)) == "(-1-i-j-k)"
