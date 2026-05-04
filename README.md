@@ -24,6 +24,14 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
 - **Left/right gcd** (`gcd_left`, `gcd_right`) built on the corresponding division
 - **Deterministic factorization** into `content`, `unit`, and Hurwitz primes (by prime norms)
 
+New helper methods on every Hurwitz integer value:
+
+* `x.content()` — largest positive integer `n` such that `x = n*y` for another Hurwitz integer `y`.
+* `x.factor_right()` — a plain ordered tuple of factors whose product via `prod_right(...)` is exactly `x`.
+* `x.factor_left()` — a plain ordered tuple of factors whose product via `prod_left(...)` is exactly `x`.
+* `x.factor_right_detail()` — structured right factorization as a `NonCommutativeFactorization`.
+* `x.factor_left_detail()` — structured left factorization as a `NonCommutativeFactorization`.
+
 ## Installation
 
 ```bash
@@ -100,21 +108,61 @@ gr = a.gcd_right(b)   # common right divisor (a = x*gr, b = y*gr)
 
 ### Factorization
 
-Factorization returns a compact normal form:
+`quatint` exposes two levels of factorization API:
+
+* `factor_right()` / `factor_left()` return a simple ordered tuple of factors.
+* `factor_right_detail()` / `factor_left_detail()` return a structured `NonCommutativeFactorization` with metadata.
+
+Use the plain methods when you just want factors that multiply back to the original value. 
+  Use the detailed methods when you care about the separated integer content, unit, normalized prime factors, or canonical ordering.
+
+### Plain factorization
+
+The flat factorization methods return a tuple of `hurwitzint` factors. Because multiplication is non-commutative, the order and direction matter.
+
+```python
+from quatint import hurwitzint, prod_left, prod_right
+
+n = hurwitzint(2, 3, 4, 53)
+
+right_factors = n.factor_right()
+assert prod_right(right_factors) == n
+
+left_factors = n.factor_left()
+assert prod_left(left_factors) == n
+```
+
+For `factor_right()`, multiply the returned factors using `prod_right(...)`, which behaves like ordinary left-to-right multiplication:
+
+```python
+assert prod_right((a, b, c)) == a * b * c
+```
+
+For `factor_left()`, multiply the returned factors using `prod_left(...)`, which multiplies each new factor on the left:
+
+```python
+assert prod_left((a, b, c)) == c * b * a
+```
+
+### Detailed factorization
+
+The detailed methods return a compact normal form, in a class called `NonCommutativeFactorization` with these properties:
 
 * `content`: maximal positive integer scalar dividing the element (in the Hurwitz sense)
 * `unit`: a norm-1 Hurwitz unit (deterministically chosen)
 * `primes`: Hurwitz primes (each with prime rational norm), normalized via unit migration
+
+`NonCommutativeFactorization` also exposes some utility methods for convenience, such as:
 
 ```python
 from quatint import hurwitzint
 
 n = hurwitzint(2, 3, 4, 53)
 
-fr = n.factor_right()
+fr = n.factor_right_detail()
 assert fr.prod_right() == n
 
-fl = n.factor_left()
+fl = n.factor_left_detail()
 assert fl.prod_left() == n
 ```
 
@@ -145,5 +193,5 @@ This means:
 * `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
-* `a.factor_left()` / `a.factor_right()` → `HurwitzFactorization`
-* `HurwitzFactorization.prod_left()` / `.prod_right()` / `.prod()`
+* `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
+* `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`

@@ -15,7 +15,7 @@ OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
 # TODO: Once Py3.9 support has been dropped, add slots=True
 # @dataclass(frozen=True, slots=True)
 @dataclass(frozen=True)
-class HurwitzFactorization:
+class NonCommutativeFactorization:
     """
     Canonical-ish normal form (deterministic):
 
@@ -693,37 +693,7 @@ class hurwitzint:
         return 1  # practically unreachable for nonzero, but safe
 
     @staticmethod
-    @cache
-    def _prime_over_rational(p: int) -> "hurwitzint":
-        """
-        Build a deterministic Hurwitz prime with norm p by Euclid from (p, 1+ui+vj).
-            This mirrors the standard construction used in proofs of 4-squares and irreducibles.
-
-        Returns:
-            hurwitzint: A Hurwitz prime with norm p.
-
-        Raises:
-            ArithmeticError: If we fail to find a Hurwitz prime with norm p.
-        """
-        p = int(p)
-
-        if p == 2:
-            # A simple norm-2 prime
-            base = hurwitzint(1, 1, 0, 0)  # norm 2
-        else:
-            u, v = next(iter(uv_for_prime(p)))
-            q = hurwitzint(1, u, v, 0)  # Lipschitz element in H(Z)
-            base = hurwitzint.gcd_right(hurwitzint(p, 0, 0, 0), q)
-
-        if abs(base) != p:
-            raise ArithmeticError("prime construction failed: gcd did not have norm p")
-
-        # Canonicalize base up to left associates (unit migration friendly for right factoring)
-        base_canon, _ = base._canonical_associate(direction="left")
-        return base_canon
-
-    @staticmethod
-    def _canonicalize_norm(factors: "HurwitzFactorization") -> "HurwitzFactorization":
+    def _canonicalize_norm(factors: "NonCommutativeFactorization") -> "NonCommutativeFactorization":
         """
         Canonicalize the prime list by sorting primes by rational norm using metacommutation swaps.
 
@@ -731,7 +701,7 @@ class hurwitzint:
             in a non-commutative setting.
 
         Returns:
-            HurwitzFactorization: The canonicalized factorization.
+            NonCommutativeFactorization: The canonicalized factorization.
         """
         primes = list(factors.primes)
         norms = [abs(p) for p in primes]
@@ -745,10 +715,10 @@ class hurwitzint:
             else:
                 i += 1
 
-        return HurwitzFactorization(content=factors.content,
-                                    unit=factors.unit,
-                                    primes=tuple(primes),
-                                    direction=factors.direction)
+        return NonCommutativeFactorization(content=factors.content,
+                                           unit=factors.unit,
+                                           primes=tuple(primes),
+                                           direction=factors.direction)
 
     def _metacommutate_pair(self,
                             q: "hurwitzint",
@@ -838,12 +808,12 @@ class hurwitzint:
         g_canon, _ = g._canonical_associate(direction="left")
         return g_canon
 
-    def factor_right(self, *, canonical: bool = True) -> HurwitzFactorization:
+    def factor_right_detail(self, *, canonical: bool = True) -> NonCommutativeFactorization:
         """
         Deterministic right factorization normal form (primitive-first).
 
         Returns content, unit, and a tuple of Hurwitz primes P1..Pk such that:
-            self = P1 * P2 * ... * Pk * content * unit
+            self = content * unit * P1 * P2 * ... * Pk
 
         Notes:
           - We do NOT expand `content` into Hurwitz primes by default because scalar
@@ -851,16 +821,16 @@ class hurwitzint:
           - Each Pi is irreducible because its norm is a rational prime.
 
         Returns:
-            HurwitzFactorization: The factorization.
+            NonCommutativeFactorization: The factorization.
 
         Raises:
             ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
         if not self:
-            return HurwitzFactorization(content=0,
-                                        unit=hurwitzint(1, 0, 0, 0),
-                                        primes=(),
-                                        direction="right")
+            return NonCommutativeFactorization(content=0,
+                                               unit=hurwitzint(1, 0, 0, 0),
+                                               primes=(),
+                                               direction="right")
 
         # Extract integer content
         m = self.content()
@@ -869,10 +839,7 @@ class hurwitzint:
 
         q = self
         if m > 1:
-            q, r = divmod(q, hurwitzint(m, 0, 0, 0))
-            if r:
-                # Shouldn't happen if content() is correct
-                raise ArithmeticError("content division produced remainder")
+            q //= hurwitzint(m, 0, 0, 0)
 
         # Now q is primitive (or at least has no large integer content).
         n = abs(q)
@@ -895,17 +862,36 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        factors = HurwitzFactorization(content=m,
-                                       unit=q,
-                                       primes=tuple(reversed(primes)),
-                                       direction="right")
+        factors = NonCommutativeFactorization(content=m,
+                                              unit=q,
+                                              primes=tuple(reversed(primes)),
+                                              direction="right")
 
         if canonical:
             return self._canonicalize_norm(factors)
 
         return factors
 
-    def factor_left(self, *, canonical: bool = True) -> HurwitzFactorization:
+    def factor_right(self, *, canonical: bool = True) -> tuple["hurwitzint", ...]:
+        """
+        Return a plain right-factor list whose product via ``prod_right`` is exactly ``self``.
+
+        This mirrors the quadratic-integer API: the unit is folded into the first factor.
+        Unlike ``factor_right_detail()``, this does *not* keep integer content separate; any
+        scalar content is factored all the way down into Hurwitz primes.
+        """
+        f = self.factor_right_detail(canonical=canonical)
+        unit = f.unit
+        factors = f.primes
+        scaler = f.content
+
+        if factors:
+            first = unit * factors[0] * scaler
+            return first, *factors[1:]
+
+        return (self,)
+
+    def factor_left_detail(self, *, canonical: bool = True) -> NonCommutativeFactorization:
         """
         Deterministic left factorization normal form.
 
@@ -915,13 +901,13 @@ class hurwitzint:
         (Same content logic; primes are normalized via right-associates instead.)
 
         Returns:
-            HurwitzFactorization: The factorization.
+            NonCommutativeFactorization: The factorization.
 
         Raises:
             ArithmeticError: If there is a problem preventing factoring.
         """
         if not self:
-            return HurwitzFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction="left")
+            return NonCommutativeFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction="left")
 
         m = self.content()
         if m < 0:
@@ -929,9 +915,7 @@ class hurwitzint:
 
         q = self
         if m > 1:
-            q, r = q.rdivmod(hurwitzint(m, 0, 0, 0))
-            if r:
-                raise ArithmeticError("content division produced remainder")
+            q = q.rfloordiv(hurwitzint(m, 0, 0, 0))
 
         n = abs(q)
         nf = factorint(n)
@@ -958,15 +942,35 @@ class hurwitzint:
         if abs(q) != 1:
             raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
 
-        factors = HurwitzFactorization(content=m,
-                                       unit=q,
-                                       primes=tuple(reversed(primes)),
-                                       direction="left")
+        factors = NonCommutativeFactorization(content=m,
+                                              unit=q,
+                                              primes=tuple(reversed(primes)),
+                                              direction="left")
 
         if canonical:
             return self._canonicalize_norm(factors)
 
         return factors
+
+    def factor_left(self, *, canonical: bool = True) -> tuple["hurwitzint", ...]:
+        """
+        Return a plain left-factor list whose product via ``prod_left`` is exactly ``self``.
+
+        Note: ``prod_left`` multiplies factors on the *left* (so the iterable order is reversed
+        in the final product). We return factors in the order that ``prod_left`` expects.
+        Unlike ``factor_left_detail()``, this does *not* keep integer content separate; any
+        scalar content is factored all the way down into Hurwitz primes.
+        """
+        f = self.factor_left_detail(canonical=canonical)
+        unit = f.unit
+        factors = f.primes
+        scaler = f.content
+
+        if factors:
+            first = factors[0] * unit * scaler
+            return first, *factors[1:]
+
+        return (self,)
     # endregion
 
 
