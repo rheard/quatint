@@ -271,6 +271,170 @@ class TestRDiv(HurwitzIntTests):
                                         assert b * res_q + res_r == a
 
 
+class TestIsUnit(HurwitzIntTests):
+    """Tests for is_unit"""
+
+    def test_units(self):
+        """Validate all known Hurwitz units are detected as units."""
+        assert len(hurwitzint.UNITS) == 24
+
+        for unit in hurwitzint.UNITS:
+            assert unit.is_unit
+            assert abs(unit) == 1
+
+    def test_non_units(self):
+        """Validate non-units are not detected as units."""
+        for n in (
+            hurwitzint(0, 0, 0, 0),
+            hurwitzint(2, 0, 0, 0),
+            hurwitzint(1, 1, 0, 0),
+            hurwitzint(1, 2, 3, 4),
+            hurwitzint(3, 1, 1, 1, half=True),
+        ):
+            assert not n.is_unit
+
+    def test_half_units(self):
+        """Validate true half-integer Hurwitz units are detected as units."""
+        for a in (-1, 1):
+            for b in (-1, 1):
+                for c in (-1, 1):
+                    for d in (-1, 1):
+                        unit = hurwitzint(a, b, c, d, half=True)
+
+                        assert unit.is_unit
+                        assert abs(unit) == 1
+
+
+class TestInverse(HurwitzIntTests):
+    """Tests for inverse"""
+
+    def test_units_inverse_by_multiplication(self):
+        """Validate every unit inverse multiplies back to one on both sides."""
+        one = hurwitzint(1, 0, 0, 0)
+
+        for unit in hurwitzint.UNITS:
+            inv = unit.inverse()
+
+            assert isinstance(inv, hurwitzint)
+            assert inv.is_unit
+            assert unit * inv == one
+            assert inv * unit == one
+
+    def test_units_inverse_is_conjugate(self):
+        """Validate the inverse of a Hurwitz unit is its conjugate."""
+        for unit in hurwitzint.UNITS:
+            assert unit.inverse() == unit.conjugate()
+
+    def test_inverse_of_inverse(self):
+        """Validate taking the inverse twice recovers the original unit."""
+        for unit in hurwitzint.UNITS:
+            assert unit.inverse().inverse() == unit
+
+    def test_non_unit_inverse_raises(self):
+        """Validate non-units do not have inverses in the Hurwitz integers."""
+        for n in (
+            hurwitzint(0, 0, 0, 0),
+            hurwitzint(2, 0, 0, 0),
+            hurwitzint(1, 1, 0, 0),
+            hurwitzint(1, 2, 3, 4),
+        ):
+            with pytest.raises(ValueError):
+                n.inverse()
+
+    def test_negative_power_for_units_if_supported(self):
+        """Validate negative powers of units agree with inverse powers."""
+        i = hurwitzint(0, 1, 0, 0)
+
+        try:
+            res = i ** -1
+        except ValueError:
+            pytest.skip("Negative powers are not supported")
+        else:
+            assert res == i.inverse()
+            assert i ** -2 == i.inverse() * i.inverse()
+
+
+class TestSplitLipschitz(HurwitzIntTests):
+    """Tests for split_lipschitz"""
+
+    def test_lipschitz_integer_returns_self_and_none(self):
+        """Validate Lipschitz/integer quaternions do not require a half-unit part."""
+        for n in (
+            hurwitzint(0, 0, 0, 0),
+            hurwitzint(1, 2, 3, 4),
+            hurwitzint(-1, -2, -3, -4),
+            hurwitzint(5, 0, -2, 7),
+        ):
+            whole, half = n.split_lipschitz()
+
+            assert whole == n
+            assert half is None
+
+    def test_half_integer_splits_into_whole_plus_half_unit(self):
+        """Validate true Hurwitz half-integers split into a Lipschitz part plus one half-unit."""
+        examples = (
+            hurwitzint(3, 5, 7, 9, half=True),
+            hurwitzint(-3, 5, -7, 9, half=True),
+            hurwitzint(1, 1, 1, 1, half=True),
+            hurwitzint(-1, -1, -1, -1, half=True),
+        )
+
+        for n in examples:
+            whole, half = n.split_lipschitz()
+
+            assert isinstance(whole, hurwitzint)
+            assert isinstance(half, hurwitzint)
+
+            assert whole.is_lipschitz
+            assert half.is_unit
+            assert not half.is_lipschitz
+
+            assert whole + half == n
+
+    def test_split_examples(self):
+        """Validate split_lipschitz returns the expected whole and half-unit parts."""
+        n = hurwitzint(3, 5, 7, 9, half=True)
+
+        whole, half = n.split_lipschitz()
+
+        self.assert_equal((2, 4, 6, 8), whole)
+        self.assert_equal((1, 1, 1, 1), half)
+        assert whole + half == n
+
+        n = hurwitzint(-3, 5, -7, 9, half=True)
+
+        whole, half = n.split_lipschitz()
+
+        self.assert_equal((-2, 4, -6, 8), whole)
+        self.assert_equal((-1, 1, -1, 1), half)
+        assert whole + half == n
+
+    def test_split_half_unit(self):
+        """Validate a half-unit splits into zero plus itself."""
+        n = hurwitzint(1, -1, 1, -1, half=True)
+
+        whole, half = n.split_lipschitz()
+
+        assert whole == hurwitzint(0, 0, 0, 0)
+        assert half == n
+        assert whole + half == n
+
+    def test_split_reconstructs_many_half_integers(self):
+        """Validate split_lipschitz reconstructs many true Hurwitz half-integers."""
+        for a in range(-9, 10, 2):
+            for b in range(-9, 10, 2):
+                for c in range(-9, 10, 2):
+                    for d in range(-9, 10, 2):
+                        n = hurwitzint(a, b, c, d, half=True)
+
+                        whole, half = n.split_lipschitz()
+
+                        assert whole.is_lipschitz
+                        assert half is not None
+                        assert half.is_unit
+                        assert whole + half == n
+
+
 class TestGcdLeft(HurwitzIntTests):
     """Tests for gcd_left"""
 

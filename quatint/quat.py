@@ -575,6 +575,42 @@ class hurwitzint:
         core = f"({ra}{_imag_term(rb, 'i')}{_imag_term(rc, 'j')}{_imag_term(rd, 'k')})"
         return f"{core}/{den}" if den is not None else core
 
+    @property
+    def is_unit(self) -> bool:
+        """Is this a unit Hurwitz integer?"""
+        # return abs(self) == 1
+        return self in self.UNITS
+
+    def inverse(self) -> "hurwitzint":
+        """Find the inverse of the current hurwitzint (only applies to units)"""
+        if not self.is_unit:
+            raise ValueError("only Hurwitz units have inverses in the Hurwitz order")
+
+        return self.conjugate()
+
+    def split_lipschitz(self) -> tuple["hurwitzint", "hurwitzint | None"]:
+        """
+        Return (whole, half_unit) such that self == whole + half_unit.
+
+        If self is already Lipschitz/integer-valued, returns (self, None).
+            Otherwise half_unit is one of the 16 Hurwitz half-units.
+        """
+        if self.is_lipschitz:
+            return self, None
+
+        def sgn(n: int) -> int:
+            return 1 if n > 0 else -1
+
+        half_unit = self._make(
+            sgn(self.a),
+            sgn(self.b),
+            sgn(self.c),
+            sgn(self.d),
+        )
+        whole = self - half_unit
+
+        return whole, half_unit
+
     # region GCD
     def _normalize_unit(self) -> "hurwitzint":
         """
