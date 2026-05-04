@@ -233,10 +233,6 @@ class hurwitzint:
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
         return self._make(self.a, -self.b, -self.c, -self.d)
 
-    def components2(self) -> tuple[int, int, int, int]:
-        """Return the stored numerator components (A,B,C,D) for (...)/2."""
-        return (self.a, self.b, self.c, self.d)
-
     def __add__(self, other: OP_TYPES) -> "hurwitzint":
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
@@ -777,7 +773,7 @@ class hurwitzint:
         best_u = None
         for u in hurwitzint.UNITS:
             cand = self * u if direction == "right" else u * self
-            key = cand.components2()
+            key = tuple(cand)
             if best is None or key < best:
                 best = key
                 best_u = u
@@ -998,7 +994,7 @@ if not hurwitzint.UNITS:
         ])
 
         # Optional:
-        out.sort(key=lambda u: u.components2())
+        out.sort(key=tuple)
         return out
 
     hurwitzint.UNITS = units()
