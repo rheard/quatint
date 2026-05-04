@@ -1,8 +1,10 @@
 # TODO: Move this to a proper package? Maybe join with splitcache into an infcache library for infinite caches?
 
+from __future__ import annotations
+
 from functools import wraps
 from threading import RLock
-from typing import Any, Callable, Generator, Hashable, Optional, TypeVar, cast
+from typing import Any, Callable, Generator, Hashable, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -15,12 +17,12 @@ class _GenCacheEntry:
 
     __slots__ = ("lock", "items", "gen", "done", "exc")
 
-    def __init__(self, gen: Generator[Any, None, None]) -> None:
+    def __init__(self, gen: Generator[Any, None, None]):
         self.lock = RLock()
         self.items: list[Any] = []
-        self.gen: Optional[Generator[Any, None, None]] = gen
+        self.gen: Generator[Any, None, None] | None = gen
         self.done: bool = False
-        self.exc: Optional[BaseException] = None
+        self.exc: BaseException | None = None
 
 
 def _make_key(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Hashable:

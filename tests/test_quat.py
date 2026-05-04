@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import os
 
 from math import isqrt
 from pathlib import Path
-from typing import Union
 
 import pytest
 
@@ -10,7 +11,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import NonCommutativeFactorization, hurwitzint, rdivmod, prod_left, prod_right
+from quatint.quat import NonCommutativeFactorization, hurwitzint, prod_left, prod_right, rdivmod
 
 @pytest.mark.skipif(os.getenv("CI", "").lower() not in {"1", "true", "yes"},
                     reason="Compiled-only test")
@@ -39,7 +40,7 @@ class HurwitzIntTests:
         self.b_int = hurwitzint(2, 3, 4, 5)
 
     @staticmethod
-    def assert_equal(res: Union[tuple, list, HurwitzQuaternion, hurwitzint], res_int: hurwitzint):
+    def assert_equal(res: tuple | list | HurwitzQuaternion | hurwitzint, res_int: hurwitzint):
         """Validate the hurwitzint is equal to the validation object, and that it is still backed by integers"""
         if isinstance(res, HurwitzQuaternion):
             res = [x * 2 for x in res]
@@ -338,7 +339,7 @@ class TestInverse(HurwitzIntTests):
             hurwitzint(1, 1, 0, 0),
             hurwitzint(1, 2, 3, 4),
         ):
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match="only Hurwitz units have inverses"):
                 n.inverse()
 
     def test_negative_power_for_units_if_supported(self):

@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from functools import cache
 from math import gcd, prod
-from typing import Callable, ClassVar, Generator, Iterable, Iterator, Literal, Optional, Union
+from typing import Callable, ClassVar, Generator, Iterable, Iterator, Literal, Union
 
 from sympy import factorint
 
@@ -26,8 +27,8 @@ class NonCommutativeFactorization:
     - Pi are Hurwitz primes (norm is a rational prime), each normalized by unit-migration.
     """
     content: int
-    unit: "hurwitzint"
-    primes: tuple["hurwitzint", ...]
+    unit: hurwitzint
+    primes: tuple[hurwitzint, ...]
     direction: Literal["left", "right"]
 
     def prod(self):
@@ -83,7 +84,7 @@ def uv_for_prime(p: int) -> Generator[tuple[int, int], None, None]:
     raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
 
 
-def mod_sqrt_prime(n: int, p: int) -> Optional[int]:
+def mod_sqrt_prime(n: int, p: int) -> int | None:
     """Return x such that x*x % p == n % p, or None if no sqrt exists. p must be prime."""
     n %= p
     if n == 0:
@@ -156,7 +157,7 @@ class hurwitzint:
     c: int
     d: int
 
-    UNITS: ClassVar[list["hurwitzint"]] = []
+    UNITS: ClassVar[list[hurwitzint]] = []
 
     def __init__(
         self,
@@ -202,12 +203,12 @@ class hurwitzint:
 
     # region constructors / conversions
     @classmethod
-    def _make(cls, A: int, B: int, C: int, D: int) -> "hurwitzint":
+    def _make(cls, A: int, B: int, C: int, D: int) -> hurwitzint:
         """Construct a new value of *this* conceptual type from internal numerators A,B,C,D."""
         return cls(A, B, C, D, half=True)
 
     @classmethod
-    def _from_obj(cls, n: OP_TYPES) -> "hurwitzint":
+    def _from_obj(cls, n: OP_TYPES) -> hurwitzint:
         """Convert a random object to a hurwitzint"""
         if isinstance(n, _OTHER_OP_TYPES):
             # scalar n -> (2n + 0i + 0j + 0k)/2
@@ -229,11 +230,11 @@ class hurwitzint:
         """Static determinant, because everything is doubled under the hood anyway"""
         return 2
 
-    def conjugate(self) -> "hurwitzint":
+    def conjugate(self) -> hurwitzint:
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
         return self._make(self.a, -self.b, -self.c, -self.d)
 
-    def __add__(self, other: OP_TYPES) -> "hurwitzint":
+    def __add__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
@@ -242,10 +243,10 @@ class hurwitzint:
 
         return NotImplemented
 
-    def __radd__(self, other: OTHER_OP_TYPES) -> "hurwitzint":
+    def __radd__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         return self.__add__(other)
 
-    def __sub__(self, other: OP_TYPES) -> "hurwitzint":
+    def __sub__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
@@ -254,16 +255,16 @@ class hurwitzint:
 
         return NotImplemented
 
-    def __rsub__(self, other: OTHER_OP_TYPES) -> "hurwitzint":
+    def __rsub__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         return self.__neg__().__add__(other)
 
-    def __neg__(self) -> "hurwitzint":
+    def __neg__(self) -> hurwitzint:
         return self._make(-self.a, -self.b, -self.c, -self.d)
 
-    def __pos__(self) -> "hurwitzint":
+    def __pos__(self) -> hurwitzint:
         return self._make(self.a, self.b, self.c, self.d)
 
-    def __mul__(self, other: OP_TYPES) -> "hurwitzint":
+    def __mul__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
@@ -289,10 +290,10 @@ class hurwitzint:
 
         return self._make(P // 2, Q // 2, R // 2, S // 2)
 
-    def __rmul__(self, other: OTHER_OP_TYPES) -> "hurwitzint":
+    def __rmul__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         return self.__mul__(other)
 
-    def __pow__(self, exp: int) -> "hurwitzint":
+    def __pow__(self, exp: int) -> hurwitzint:
         e = int(exp)
         if e < 0:
             raise ValueError("Negative powers not supported")
@@ -312,11 +313,11 @@ class hurwitzint:
     # region Euclidean division (Hurwitz order is norm-Euclidean)
     def _division(
             self,
-            num: "hurwitzint",
-            divisor: "hurwitzint",
+            num: hurwitzint,
+            divisor: hurwitzint,
             divisor_norm: int,
-            remainder: Callable[["hurwitzint", "hurwitzint", "hurwitzint"], "hurwitzint"] = lambda a, b, c: a - b * c) \
-            -> tuple["hurwitzint", "hurwitzint"]:
+            remainder: Callable[[hurwitzint, hurwitzint, hurwitzint], hurwitzint] = lambda a, b, c: a - b * c) \
+            -> tuple[hurwitzint, hurwitzint]:
         """
         A shared division algorithm.
 
@@ -391,7 +392,7 @@ class hurwitzint:
         return q, r
 
     # region Left-division helpers (non-commutative!)
-    def __divmod__(self, other: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
+    def __divmod__(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
         """
         Nearest-lattice division in the Hurwitz quaternion order.
 
@@ -423,46 +424,46 @@ class hurwitzint:
 
         return self._division(num, other, n)
 
-    def __truediv__(self, other: OP_TYPES) -> "hurwitzint":
+    def __truediv__(self, other: OP_TYPES) -> hurwitzint:
         # mirror QuadInt: treat / as Euclidean division in this domain
         return self.__floordiv__(other)
 
-    def __rtruediv__(self, other: OTHER_OP_TYPES) -> "hurwitzint":
+    def __rtruediv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             new_other = self._from_obj(other)
             return new_other.__truediv__(self)
 
         return NotImplemented
 
-    def __floordiv__(self, other: OP_TYPES) -> "hurwitzint":
+    def __floordiv__(self, other: OP_TYPES) -> hurwitzint:
         q, _ = divmod(self, other)
         return q
 
-    def __rfloordiv__(self, other: OTHER_OP_TYPES) -> "hurwitzint":
+    def __rfloordiv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             new_other = self._from_obj(other)
             return new_other.__floordiv__(self)
 
         return NotImplemented
 
-    def __mod__(self, other: OP_TYPES) -> "hurwitzint":
+    def __mod__(self, other: OP_TYPES) -> hurwitzint:
         _, r = divmod(self, other)
         return r
     # endregion
 
     # region Right-division helpers
-    def rdivmod(self, other: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
+    def rdivmod(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
         """
         Right-quotient division in the Hurwitz quaternion order.
 
         Defines quotient on the RIGHT:
             self = other * q + r
 
-        Raises:
-            ZeroDivisionError: If trying to divide by 0.
-
         Returns:
             (q, r)
+
+        Raises:
+            ZeroDivisionError: If trying to divide by 0.
         """
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
@@ -479,16 +480,16 @@ class hurwitzint:
 
         return self._division(num, other, n, lambda a, b, c: a - c * b)
 
-    def rtruediv(self, other: OP_TYPES) -> "hurwitzint":
+    def rtruediv(self, other: OP_TYPES) -> hurwitzint:
         """A version of __truediv__ for right-division"""
         return self.rfloordiv(other)
 
-    def rfloordiv(self, other: OP_TYPES) -> "hurwitzint":
+    def rfloordiv(self, other: OP_TYPES) -> hurwitzint:
         """A version of __floordiv__ for right-division"""
         q, _ = self.rdivmod(other)
         return q
 
-    def rmod(self, other: OP_TYPES) -> "hurwitzint":
+    def rmod(self, other: OP_TYPES) -> hurwitzint:
         """A version of __mod__ for right-division"""
         _, r = self.rdivmod(other)
         return r
@@ -502,11 +503,11 @@ class hurwitzint:
 
         Always an integer for valid Hurwitz integers.
 
-        Raises:
-            ArithmeticError: If there is a non-integral norm due to parity violation.
-
         Returns:
             int: The norm.
+
+        Raises:
+            ArithmeticError: If there is a non-integral norm due to parity violation.
         """
         num = self.a * self.a + self.b * self.b + self.c * self.c + self.d * self.d
         # q, r = divmod(num, 4)   # Below is ever so slightly faster it seems, and this is an important operation
@@ -581,19 +582,21 @@ class hurwitzint:
         # return abs(self) == 1
         return self in self.UNITS
 
-    def inverse(self) -> "hurwitzint":
+    def inverse(self) -> hurwitzint:
         """Find the inverse of the current hurwitzint (only applies to units)"""
         if not self.is_unit:
             raise ValueError("only Hurwitz units have inverses in the Hurwitz order")
 
         return self.conjugate()
 
-    def split_lipschitz(self) -> tuple["hurwitzint", "hurwitzint | None"]:
+    def split_lipschitz(self) -> tuple[hurwitzint, hurwitzint | None]:
         """
         Return (whole, half_unit) such that self == whole + half_unit.
 
-        If self is already Lipschitz/integer-valued, returns (self, None).
-            Otherwise half_unit is one of the 16 Hurwitz half-units.
+        Returns:
+            tuple: (whole, half_unit)
+                If self is already Lipschitz/integer-valued, returns (self, None).
+                    Otherwise half_unit is one of the 16 Hurwitz half-units.
         """
         if self.is_lipschitz:
             return self, None
@@ -612,7 +615,7 @@ class hurwitzint:
         return whole, half_unit
 
     # region GCD
-    def _normalize_unit(self) -> "hurwitzint":
+    def _normalize_unit(self) -> hurwitzint:
         """
         Deterministic associate choice up to ±1.
 
@@ -638,7 +641,7 @@ class hurwitzint:
              other: OP_TYPES,
              *,
              divmod_method: Callable = divmod,
-             normalize: bool = True) -> "hurwitzint":
+             normalize: bool = True) -> hurwitzint:
         """GCD via Euclidean algorithm."""
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
@@ -670,7 +673,7 @@ class hurwitzint:
     def gcd_right(self,
                   other: OP_TYPES,
                   *,
-                  normalize: bool = True) -> "hurwitzint":
+                  normalize: bool = True) -> hurwitzint:
         """
         Right gcd via left-division Euclidean algorithm.
 
@@ -686,7 +689,7 @@ class hurwitzint:
     def gcd_left(self,
                  other: OP_TYPES,
                  *,
-                 normalize: bool = True) -> "hurwitzint":
+                 normalize: bool = True) -> hurwitzint:
         """
         Left gcd via RIGHT-division Euclidean algorithm.
 
@@ -725,7 +728,7 @@ class hurwitzint:
         return 1  # practically unreachable for nonzero, but safe
 
     @staticmethod
-    def _canonicalize_norm(factors: "NonCommutativeFactorization") -> "NonCommutativeFactorization":
+    def _canonicalize_norm(factors: NonCommutativeFactorization) -> NonCommutativeFactorization:
         """
         Canonicalize the prime list by sorting primes by rational norm using metacommutation swaps.
 
@@ -753,8 +756,8 @@ class hurwitzint:
                                            direction=factors.direction)
 
     def _metacommutate_pair(self,
-                            q: "hurwitzint",
-                            direction: Literal["left", "right"]) -> tuple["hurwitzint", "hurwitzint"]:
+                            q: hurwitzint,
+                            direction: Literal["left", "right"]) -> tuple[hurwitzint, hurwitzint]:
         """
         Metacommutation step for adjacent primes of *distinct* rational norms.
 
@@ -797,7 +800,7 @@ class hurwitzint:
         p_adj = u.conjugate() * best_p if direction == "right" else best_p * u.conjugate()
         return q_canon, p_adj
 
-    def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple["hurwitzint", "hurwitzint"]:
+    def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple[hurwitzint, hurwitzint]:
         """
         Unit-migration normalization for a *left* factor:
             replace p by p*u (u a unit).
@@ -819,7 +822,7 @@ class hurwitzint:
             return self * best_u, best_u
         return best_u * self, best_u
 
-    def _extract_right_prime(self, p: int) -> "hurwitzint":
+    def _extract_right_prime(self, p: int) -> hurwitzint:
         """
         Extract a right prime of norm p dividing self.
             g = gcd_right(self, p)
@@ -904,14 +907,8 @@ class hurwitzint:
 
         return factors
 
-    def factor_right(self, *, canonical: bool = True) -> tuple["hurwitzint", ...]:
-        """
-        Return a plain right-factor list whose product via ``prod_right`` is exactly ``self``.
-
-        This mirrors the quadratic-integer API: the unit is folded into the first factor.
-        Unlike ``factor_right_detail()``, this does *not* keep integer content separate; any
-        scalar content is factored all the way down into Hurwitz primes.
-        """
+    def factor_right(self, *, canonical: bool = True) -> tuple[hurwitzint, ...]:
+        """Return a plain right-factor list whose product via `prod_right` is exactly `self`."""
         f = self.factor_right_detail(canonical=canonical)
         unit = f.unit
         factors = f.primes
@@ -984,14 +981,15 @@ class hurwitzint:
 
         return factors
 
-    def factor_left(self, *, canonical: bool = True) -> tuple["hurwitzint", ...]:
+    def factor_left(self, *, canonical: bool = True) -> tuple[hurwitzint, ...]:
         """
-        Return a plain left-factor list whose product via ``prod_left`` is exactly ``self``.
+        Return a plain left-factor list whose product via `prod_left` is exactly `self`.
 
-        Note: ``prod_left`` multiplies factors on the *left* (so the iterable order is reversed
-        in the final product). We return factors in the order that ``prod_left`` expects.
-        Unlike ``factor_left_detail()``, this does *not* keep integer content separate; any
-        scalar content is factored all the way down into Hurwitz primes.
+        Note: `prod_left` multiplies factors on the *left* (so the iterable order is reversed
+            in the final product). We return factors in the order that `prod_left` expects.
+
+        Returns:
+            tuple: The factors of self.
         """
         f = self.factor_left_detail(canonical=canonical)
         unit = f.unit
@@ -1007,7 +1005,7 @@ class hurwitzint:
 
 
 if not hurwitzint.UNITS:
-    def units() -> list["hurwitzint"]:
+    def units() -> list[hurwitzint]:
         """All the unit directions from the origin"""
         # ±1, ±i, ±j, ±k, and (±1±i±j±k)/2 (16 of them).
         out: list[hurwitzint] = []
@@ -1036,22 +1034,22 @@ if not hurwitzint.UNITS:
     hurwitzint.UNITS = units()
 
 
-def rdivmod(a: "hurwitzint", b: OP_TYPES) -> tuple["hurwitzint", "hurwitzint"]:
+def rdivmod(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
     """Simply a helper method to match existing Python divmod syntax"""
     return a.rdivmod(b)
 
 
-def gcd_left(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
+def gcd_left(a: hurwitzint, b: OP_TYPES) -> hurwitzint:
     """Simply a helper method to match existing Python gcd syntax"""
     return a.gcd_left(b)
 
 
-def gcd_right(a: "hurwitzint", b: OP_TYPES) -> "hurwitzint":
+def gcd_right(a: hurwitzint, b: OP_TYPES) -> hurwitzint:
     """Simply a helper method to match existing Python gcd syntax"""
     return a.gcd_right(b)
 
 
-def prod_right(x: Iterable[OP_TYPES], start: Union[OP_TYPES, None] = None):
+def prod_right(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
     """Simply a helper method to match existing Python prod syntax"""
     if start is None:
         start = 1
@@ -1059,7 +1057,7 @@ def prod_right(x: Iterable[OP_TYPES], start: Union[OP_TYPES, None] = None):
     return prod(x, start=start)
 
 
-def prod_left(x: Iterable[OP_TYPES], start: Union[OP_TYPES, None] = None):
+def prod_left(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
     """Simply a helper method to match existing Python prod syntax"""
     if start is None:
         start = 1
