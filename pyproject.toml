@@ -34,6 +34,16 @@ dependencies = [
     "sympy<=1.12.1",
 ]
 
+[project.optional-dependencies]
+test = [
+    "mypy[mypyc]",
+    "setuptools",
+    "pytest-xdist",
+    "ruff",
+    "pylint",
+    "hurwitz",
+]
+
 [project.urls]
 Repository = "https://github.com/rheard/quatint"
 
@@ -45,9 +55,9 @@ before-test = [
     'mkdir "{project}/temp"',
     'mv "{project}/quatint" "{project}/temp/quatint"',  # Move the .py files away so they are not used in testing
 ]
-test-requires=["ruff", "pylint", "pytest", "hurwitz"]
+test-requires=["ruff", "pylint", "pytest-xdist", "hurwitz"]
 test-command=[
-    "python -m pytest {project}/tests",
+    "python -m pytest -n auto {project}/tests",
     "ruff check {project}",
 
     # Require docstrings on all unit tests!

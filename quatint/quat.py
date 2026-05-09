@@ -75,13 +75,16 @@ def uv_for_prime(p: int) -> Generator[tuple[int, int], None, None]:
         yield 0, 1
         return
 
+    found = False
     for u in range(p):
         t = (-1 - (u * u)) % p
         v = mod_sqrt_prime(t, p)
         if v is not None:
+            found = True
             yield u, v
 
-    raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
+    if not found:
+        raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
 
 
 def mod_sqrt_prime(n: int, p: int) -> int | None:
