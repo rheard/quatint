@@ -502,8 +502,7 @@ class hurwitzint:
     @property
     def is_unit(self) -> bool:
         """Is this a unit Hurwitz integer?"""
-        # return abs(self) == 1
-        return self in self.UNITS
+        return abs(self) == 1
 
     def inverse(self) -> hurwitzint:
         """Find the inverse of the current hurwitzint (only applies to units)"""
