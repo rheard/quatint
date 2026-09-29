@@ -136,6 +136,19 @@ class TestEq(HurwitzIntTests):
         assert self.a_int == c
         assert self.b_int != c
 
+    def test_every_part_counts(self):
+        """Changing any one part gives a different value, so == has to compare all four parts"""
+        for x in (hurwitzint(1, 2, 3, 4), hurwitzint(3, 5, 7, 9, half=True)):
+            for idx in range(4):
+                for step in (2, -2):  # a step of 2 keeps the parity, so this is still a Hurwitz integer
+                    parts = list(x)
+                    parts[idx] += step
+                    y = hurwitzint(*parts, half=True)
+
+                    assert x != y
+                    assert y != x
+                    assert not operator.eq(x, y)
+
     def test_other_types_are_never_equal(self):
         """A hurwitzint never equals something that is not a number, not even a sequence of its own parts"""
         x = hurwitzint(1, 2, 3, 4)
