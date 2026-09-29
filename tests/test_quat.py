@@ -35,6 +35,22 @@ class HurwitzIntTests:
     """Support methods for testing hurwitzint"""
     a, b, a_int, b_int = None, None, None, None
 
+    # Divisors for the division wide searches, with norms from 1 to 41, both kinds, and negative parts
+    division_divisors = (
+        hurwitzint(1, 1, 1, 1, half=True),  # norm 1, a unit, so every division is exact
+        hurwitzint(1, 1, 0, 0),  # norm 2
+        hurwitzint(1, -1, 1, 0),  # norm 3
+        hurwitzint(3, -1, 1, 1, half=True),  # norm 3
+        hurwitzint(2, 0, 0, 0),  # norm 4, an integer
+        hurwitzint(1, 2, 0, 0),  # norm 5
+        hurwitzint(-3, 3, -1, 1, half=True),  # norm 5
+        hurwitzint(1, 2, -1, 0),  # norm 6
+        hurwitzint(2, -1, 1, 1),  # norm 7
+        hurwitzint(-5, 1, 3, -1, half=True),  # norm 9
+        hurwitzint(1, 2, 3, 4),  # norm 30
+        hurwitzint(3, -5, 7, 9, half=True),  # norm 41
+    )
+
     def setup_method(self, _):
         """Setup some test data"""
         self.a = HurwitzQuaternion(1, 2, 3, 4)
@@ -344,24 +360,18 @@ class TestDiv(HurwitzIntTests):
         self.assert_equal(res_r, res_int_r)
 
     def test_wide_search(self):
-        """Test many different hurwitzint division operations"""
-        a_max = 7
-        b_max = 3
+        """
+        Divide every small dividend by a spread of divisors, and check each remainder is as small as promised.
 
-        for a1 in range(1, a_max):
-            for b1 in range(1, a_max):
-                for c1 in range(1, a_max):
-                    for d1 in range(1, a_max):
-                        for a2 in range(1, b_max):
-                            for b2 in range(1, b_max):
-                                for c2 in range(1, b_max):
-                                    for d2 in range(1, b_max):
-                                        a = hurwitzint(a1, b1, c1, d1)
-                                        b = hurwitzint(a2, b2, c2, d2)
+        a == q*b + r alone holds for any q at all, since divmod works r out as a - q*b. A correct quotient is what
+            makes the remainder small: every quaternion is within norm 1/2 of a Hurwitz integer, so 2*N(r) <= N(b).
+        """
+        for b in self.division_divisors:
+            for a in self.wide_search_values():
+                q, r = divmod(a, b)
 
-                                        res_q, res_r = divmod(a, b)
-
-                                        assert res_q * b + res_r == a
+                assert q * b + r == a
+                assert 2 * abs(r) <= abs(b)
 
     def test_divmod_int_reversed(self):
         """Test divmod(int, hurwitzint), int // hurwitzint and int % hurwitzint"""
@@ -439,24 +449,13 @@ class TestRDiv(HurwitzIntTests):
         assert g * q == a
 
     def test_wide_search(self):
-        """Test many different hurwitzint right-division operations"""
-        a_max = 7
-        b_max = 3
+        """The right-division version of TestDiv.test_wide_search: a == b*q + r, with 2*N(r) <= N(b)"""
+        for b in self.division_divisors:
+            for a in self.wide_search_values():
+                q, r = rdivmod(a, b)
 
-        for a1 in range(1, a_max):
-            for b1 in range(1, a_max):
-                for c1 in range(1, a_max):
-                    for d1 in range(1, a_max):
-                        for a2 in range(1, b_max):
-                            for b2 in range(1, b_max):
-                                for c2 in range(1, b_max):
-                                    for d2 in range(1, b_max):
-                                        a = hurwitzint(a1, b1, c1, d1)
-                                        b = hurwitzint(a2, b2, c2, d2)
-
-                                        res_q, res_r = rdivmod(a, b)
-
-                                        assert b * res_q + res_r == a
+                assert b * q + r == a
+                assert 2 * abs(r) <= abs(b)
 
     def test_unsupported_types_raise_type_error(self):
         """An unsupported operand type should raise TypeError, not NotImplementedError"""
