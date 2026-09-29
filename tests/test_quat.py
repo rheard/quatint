@@ -4,6 +4,7 @@ import copy
 import operator
 import os
 import pickle
+import random
 
 from itertools import product
 from math import gcd, isqrt
@@ -82,6 +83,46 @@ class HurwitzIntTests:
 
         for a, b, c, d in product(range(-5, 6, 2), repeat=4):
             yield hurwitzint(a, b, c, d, half=True)
+
+    @staticmethod
+    def rand_hurwitzint(rng: random.Random, bound: int) -> hurwitzint:
+        """A random nonzero Hurwitz integer with parts in [-bound, bound], a half-integer half of the time"""
+        while True:
+            if rng.random() < 0.5:
+                x = hurwitzint(*(rng.randint(-bound, bound) for _ in range(4)))
+            else:
+                x = hurwitzint(*(2 * rng.randint(-bound, bound - 1) + 1 for _ in range(4)), half=True)
+
+            if x:
+                return x
+
+    @staticmethod
+    def smallest_remainder_norm(a: hurwitzint, b: hurwitzint, *, right: bool = False) -> int:
+        """
+        Brute-force the smallest N(r) that any Hurwitz quotient q can leave, in a = q*b + r (or a = b*q + r).
+
+        In numerator units the exact quotient is U/n, where n = N(b) and U = a*conj(b) (or conj(b)*a). The nearest
+            Hurwitz integer has, in every part, one of the two even integers around U_i/n, or else one of the two odd
+            ones around it, so trying all 2 * 2**4 of those is sure to include it.
+
+        Returns:
+            int: The smallest possible remainder norm.
+        """
+        n = abs(b)
+        U = list(b.conjugate() * a) if right else list(a * b.conjugate())
+
+        smallest = None
+        for parity in (0, 1):
+            # The largest integer of this parity that is <= U_i/n, and so the one 2 above it is > U_i/n
+            lows = [u // n - ((u // n - parity) & 1) for u in U]
+            for s0, s1, s2, s3 in product((0, 2), repeat=4):
+                q = hurwitzint(lows[0] + s0, lows[1] + s1, lows[2] + s2, lows[3] + s3, half=True)
+                r = a - b * q if right else a - q * b
+                if smallest is None or abs(r) < smallest:
+                    smallest = abs(r)
+
+        assert smallest is not None
+        return smallest
 
 
 class TestEq(HurwitzIntTests):
@@ -373,6 +414,35 @@ class TestDiv(HurwitzIntTests):
                 assert q * b + r == a
                 assert 2 * abs(r) <= abs(b)
 
+    def test_random_remainder_is_smallest(self):
+        """For random pairs of every size, the remainder is as small as any Hurwitz quotient could make it"""
+        rng = random.Random(1_000)
+        for bound_a, bound_b in ((10, 3), (10, 10**4), (10**4, 10**2), (10**12, 10**5), (10**30, 10**12)):
+            for _ in range(150):
+                a = self.rand_hurwitzint(rng, bound_a)
+                b = self.rand_hurwitzint(rng, bound_b)
+                q, r = divmod(a, b)
+
+                assert q * b + r == a
+                assert 2 * abs(r) <= abs(b)
+                assert abs(r) == self.smallest_remainder_norm(a, b)
+
+    def test_exact_multiples_divide_exactly(self):
+        """Dividing q*b by b gives back exactly q with no remainder, for random q and b of every size"""
+        rng = random.Random(2_000)
+        for bound in (3, 10**4, 10**12, 10**30):
+            for _ in range(250):
+                q = self.rand_hurwitzint(rng, bound)
+                b = self.rand_hurwitzint(rng, bound)
+
+                assert divmod(q * b, b) == (q, 0)
+
+    def test_divide_by_units(self):
+        """Dividing by a unit u is exact: the quotient is a * u^-1, and nothing is left over"""
+        for u in hurwitzint.UNITS:
+            for a in self.division_divisors:
+                assert divmod(a, u) == (a * u.inverse(), 0)
+
     def test_divmod_int_reversed(self):
         """Test divmod(int, hurwitzint), int // hurwitzint and int % hurwitzint"""
         for b in (self.b_int, hurwitzint(3, 5, 7, 9, half=True)):
@@ -456,6 +526,35 @@ class TestRDiv(HurwitzIntTests):
 
                 assert b * q + r == a
                 assert 2 * abs(r) <= abs(b)
+
+    def test_random_remainder_is_smallest(self):
+        """The right-division version of TestDiv.test_random_remainder_is_smallest"""
+        rng = random.Random(3_000)
+        for bound_a, bound_b in ((10, 3), (10, 10**4), (10**4, 10**2), (10**12, 10**5), (10**30, 10**12)):
+            for _ in range(150):
+                a = self.rand_hurwitzint(rng, bound_a)
+                b = self.rand_hurwitzint(rng, bound_b)
+                q, r = rdivmod(a, b)
+
+                assert b * q + r == a
+                assert 2 * abs(r) <= abs(b)
+                assert abs(r) == self.smallest_remainder_norm(a, b, right=True)
+
+    def test_exact_multiples_divide_exactly(self):
+        """Right-dividing b*q by b gives back exactly q with no remainder, for random q and b of every size"""
+        rng = random.Random(4_000)
+        for bound in (3, 10**4, 10**12, 10**30):
+            for _ in range(250):
+                q = self.rand_hurwitzint(rng, bound)
+                b = self.rand_hurwitzint(rng, bound)
+
+                assert rdivmod(b * q, b) == (q, 0)
+
+    def test_divide_by_units(self):
+        """Right-dividing by a unit u is exact: the quotient is u^-1 * a, and nothing is left over"""
+        for u in hurwitzint.UNITS:
+            for a in self.division_divisors:
+                assert rdivmod(a, u) == (u.inverse() * a, 0)
 
     def test_unsupported_types_raise_type_error(self):
         """An unsupported operand type should raise TypeError, not NotImplementedError"""
