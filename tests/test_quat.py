@@ -7,7 +7,7 @@ import pickle
 import random
 
 from fractions import Fraction
-from itertools import product
+from itertools import product, starmap
 from math import floor, gcd, isqrt
 from pathlib import Path
 
@@ -402,6 +402,111 @@ class TestPow(HurwitzIntTests):
 
         assert pow(x, Other()) == "rpow"
 
+    def test_power_laws(self):
+        """x**(m+n) == x**m * x**n and (x**m)**n == x**(m*n) for random x, and norms and conjugates follow along"""
+        rng = random.Random(6_000)
+        for bound in (3, 10**4, 10**12):
+            for _ in range(30):
+                x = self.rand_hurwitzint(rng, bound)
+                m, n = rng.randint(0, 8), rng.randint(0, 8)
+
+                assert x ** (m + n) == x ** m * x ** n
+                assert (x ** m) ** n == x ** (m * n)
+                assert abs(x ** n) == abs(x) ** n
+                assert x.conjugate() ** n == (x ** n).conjugate()
+
+    def test_unit_orders(self):
+        """Each unit's order is 1, 2, 3, 4 or 6, just like in the binary tetrahedral group the 24 of them form"""
+        orders = []
+        for u in hurwitzint.UNITS:
+            powers = [u ** n for n in range(1, 13)]
+            orders.append(1 + powers.index(1))
+
+            assert powers[-1] == 1  # u**12 == 1, since 12 is a multiple of every order
+
+        # 1, then -1, then the 8 like (-1+i+j+k)/2, the 6 like i, and the 8 like (1+i+j+k)/2
+        assert sorted(orders) == [1, 2] + [3] * 8 + [4] * 6 + [6] * 8
+
+    def test_negative_powers_of_non_units_raise(self):
+        """A non-unit has no inverse among the Hurwitz integers, so a negative power of one raises ValueError"""
+        for x in (hurwitzint(2), hurwitzint(1, 1, 0, 0), hurwitzint(3, 5, 7, 9, half=True)):
+            with pytest.raises(ValueError, match="Negative powers"):
+                pow(x, -1)
+
+
+class TestAlgebra(HurwitzIntTests):
+    """Tests that the arithmetic follows the laws of quaternion algebra, for random values of every size"""
+
+    @classmethod
+    def random_triples(cls, seed: int):
+        """Seeded random triples of Hurwitz integers, with parts from 3 up to around 10**30"""
+        rng = random.Random(seed)
+        for bound in (3, 10**4, 10**30):
+            for _ in range(100):
+                yield cls.rand_hurwitzint(rng, bound), cls.rand_hurwitzint(rng, bound), cls.rand_hurwitzint(rng, bound)
+
+    def test_multiplication_table(self):
+        """i, j and k multiply as i^2 = j^2 = k^2 = ijk = -1 says, which pins down every sign in the product"""
+        i, j, k = hurwitzint(0, 1, 0, 0), hurwitzint(0, 0, 1, 0), hurwitzint(0, 0, 0, 1)
+
+        assert i * i == j * j == k * k == i * j * k == -1
+        assert (i * j, j * k, k * i) == (k, i, j)
+        assert (j * i, k * j, i * k) == (-k, -i, -j)
+
+    def test_ring_laws(self):
+        """Addition and multiplication are associative, addition is commutative, and multiplication distributes"""
+        for a, b, c in self.random_triples(5_000):
+            assert (a + b) + c == a + (b + c)
+            assert a + b == b + a
+            assert (a * b) * c == a * (b * c)
+            assert a * (b + c) == a * b + a * c
+            assert (a + b) * c == a * c + b * c
+
+    def test_identities_and_negation(self):
+        """0 and 1 are the identities, a - b is a + (-b), and negation undoes itself"""
+        for a, b, _ in self.random_triples(5_001):
+            assert a + 0 == 0 + a == a
+            assert a * 1 == 1 * a == a
+            assert a * 0 == 0 * a == 0
+            assert a - b == a + (-b) == -(b - a)
+            assert a - a == 0
+            assert a * -1 == -a
+
+            negated = -a
+            assert -negated == +a == a
+
+    def test_integers_commute(self):
+        """An integer commutes with everything, even though Hurwitz integers generally do not commute"""
+        commuting_pairs = 0
+        for a, b, _ in self.random_triples(5_002):
+            for m in (2, -3, 10**20):
+                assert m * a == a * m
+                assert hurwitzint(m) * a == a * hurwitzint(m)
+
+            commuting_pairs += a * b == b * a
+
+        assert commuting_pairs < 30
+
+    def test_norm_is_multiplicative(self):
+        """N(ab) = N(a)N(b), and the norm of anything nonzero is positive"""
+        for a, b, _ in self.random_triples(5_003):
+            assert abs(a * b) == abs(a) * abs(b)
+            assert abs(a) > 0
+
+        assert abs(hurwitzint(0)) == 0
+
+    def test_conjugate(self):
+        """Conjugation undoes itself and reverses products, and a times its conjugate is its norm"""
+        for a, b, _ in self.random_triples(5_004):
+            assert a.conjugate().conjugate() == a
+            assert (a * b).conjugate() == b.conjugate() * a.conjugate()
+            assert (a + b).conjugate() == a.conjugate() + b.conjugate()
+            assert a * a.conjugate() == a.conjugate() * a == abs(a)
+            assert abs(a.conjugate()) == abs(a)
+
+            # a + conj(a) is twice the real part, and the real part is a.a / 2
+            assert a + a.conjugate() == a.a
+
 
 class TestDiv(HurwitzIntTests):
     """Tests for __truediv__ and __floordiv__"""
@@ -682,6 +787,20 @@ class TestIsUnit(HurwitzIntTests):
 
                         assert unit.is_unit
                         assert abs(unit) == 1
+
+    def test_units_form_a_group(self):
+        """UNITS holds every Hurwitz integer of norm 1, and they are closed under multiplication and inverses"""
+        # Every part of something with norm 1 is within 1 of zero, so these are all the candidates
+        near_zero = list(starmap(hurwitzint, product((-1, 0, 1), repeat=4)))
+        near_zero += [hurwitzint(*p, half=True) for p in product((-1, 1), repeat=4)]
+        units = set(hurwitzint.UNITS)
+
+        assert {x for x in near_zero if abs(x) == 1} == units
+        assert len(units) == 24
+        for u in units:
+            assert u.inverse() in units
+            for v in units:
+                assert u * v in units
 
 
 class TestInverse(HurwitzIntTests):
