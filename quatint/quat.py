@@ -485,12 +485,28 @@ class hurwitzint:
         raise IndexError("hurwitzint index out of range (valid: 0..3)")
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, hurwitzint):
-            return False
+        if isinstance(other, hurwitzint):
+            return (self.a, self.b, self.c, self.d) == (other.a, other.b, other.c, other.d)
 
-        return (self.a, self.b, self.c, self.d) == (other.a, other.b, other.c, other.d)
+        # Python numbers compare exactly (unlike arithmetic, which truncates floats with int()), since anything equal
+        #   has to hash the same too (see __hash__). A complex off the real axis is never equal.
+        if isinstance(other, int):
+            return self.b == 0 and self.c == 0 and self.d == 0 and self.a == 2 * other
+
+        if isinstance(other, (float, complex)):
+            real, imag = other.real, other.imag
+            if imag or not real.is_integer():
+                return False
+
+            return self.b == 0 and self.c == 0 and self.d == 0 and self.a == 2 * int(real)
+
+        return False
 
     def __hash__(self) -> int:
+        # Equal objects must hash the same, so a real value hashes like the int it equals (see __eq__)
+        if self.b == 0 and self.c == 0 and self.d == 0:
+            return hash(self.a // 2)
+
         return hash((self.a, self.b, self.c, self.d))
 
     def __repr__(self) -> str:

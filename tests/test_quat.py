@@ -66,6 +66,47 @@ class TestEq(HurwitzIntTests):
         assert self.b_int != c
 
 
+class TestEqualityWithNumbers(HurwitzIntTests):
+    """Tests for __eq__ and __hash__ against plain Python numbers"""
+
+    def test_real_values_compare_and_hash_like_int(self):
+        """A real hurwitzint compares and hashes exactly like the int it equals, against ints, floats and complexes"""
+        # 2**53 + 1 and larger do not survive float(), and -1 is the one int whose hash is not itself
+        ints = [0, 1, -1, 2, -4, 7, 2**53, 2**53 + 1, 2**64 + 1, -(2**70)]
+        numbers = [*ints, *(float(n) for n in ints), *(complex(n, 0) for n in ints)]
+        numbers += [1.5, -0.5, -0.0, 1.9, float("inf"), float("-inf"), float("nan"), 1j, complex(2, 1)]
+
+        for n in ints:
+            x = hurwitzint(n)
+            for number in numbers:
+                assert (x == number) == (n == number)
+                assert (number == x) == (number == n)
+                assert operator.ne(x, number) == operator.ne(n, number)
+                assert operator.ne(number, x) == operator.ne(number, n)
+
+                if x == number:
+                    assert hash(x) == hash(number)
+
+    def test_non_real_values_never_equal_numbers(self):
+        """Anything with an i, j or k part (so every half-integer) never equals a Python number"""
+        numbers = (0, 1, 2, 3, 0.5, 1.5, 3.0, 1j, 1 + 1j, complex(3, 1))
+        for x in (hurwitzint(0, 1, 0, 0), hurwitzint(3, 0, 0, 1), hurwitzint(1, 0, 2, 0),
+                  hurwitzint(1, 1, 1, 1, half=True), hurwitzint(3, -1, 1, -1, half=True)):
+            for number in numbers:
+                assert x != number
+                assert number != x
+                assert not operator.eq(x, number)
+
+    def test_dict_and_set_membership(self):
+        """A real hurwitzint and the number it equals are the same dict key and set member"""
+        assert {1: "int"}[hurwitzint(1)] == "int"
+        assert {hurwitzint(3): "hurwitzint"}[3.0] == "hurwitzint"
+        assert hurwitzint(-1) in {-1, 5}
+
+        equal_values = [hurwitzint(2), 2, 2.0, complex(2, 0)]
+        assert len(set(equal_values)) == 1
+
+
 class TestAdd(HurwitzIntTests):
     """Tests for __add__"""
 
