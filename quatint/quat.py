@@ -325,17 +325,17 @@ class hurwitzint:
         Because multiplication is non-commutative, this is a specific choice.
 
         Returns:
-            (q, r) where r has small norm (typically < abs(other)).
+            (q, r) where r has small norm (typically < abs(other)),
+                or NotImplemented if other is an unsupported type.
 
         Raises:
             ZeroDivisionError: if other == 0
-            NotImplementedError: if other is unsupported type
         """
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
-            raise NotImplementedError
+            return NotImplemented
 
         n = abs(other)
         if n == 0:
@@ -366,8 +366,12 @@ class hurwitzint:
         return NotImplemented
 
     def __floordiv__(self, other: OP_TYPES) -> hurwitzint:
-        q, _ = divmod(self, other)
-        return q
+        # Not divmod(self, other), so an unsupported other gets its own __rfloordiv__ and a TypeError naming //
+        qr = self.__divmod__(other)
+        if qr is NotImplemented:
+            return NotImplemented
+
+        return qr[0]
 
     def __rfloordiv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
@@ -377,8 +381,11 @@ class hurwitzint:
         return NotImplemented
 
     def __mod__(self, other: OP_TYPES) -> hurwitzint:
-        _, r = divmod(self, other)
-        return r
+        qr = self.__divmod__(other)
+        if qr is NotImplemented:
+            return NotImplemented
+
+        return qr[1]
 
     def __rmod__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
@@ -400,13 +407,14 @@ class hurwitzint:
             (q, r)
 
         Raises:
+            TypeError: If other is an unsupported type.
             ZeroDivisionError: If trying to divide by 0.
         """
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
-            raise NotImplementedError
+            raise TypeError(f"unsupported type for rdivmod: {type(other).__name__!r}")
 
         n = abs(other)
         if n == 0:

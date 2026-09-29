@@ -269,6 +269,34 @@ class TestDiv(HurwitzIntTests):
             with pytest.raises(TypeError):
                 op(None, self.b_int)
 
+    def test_unsupported_types_raise_type_error(self):
+        """An unsupported operand type should raise TypeError (as it does for int), not NotImplementedError"""
+        for op in (divmod, operator.floordiv, operator.mod, operator.truediv):
+            with pytest.raises(TypeError):
+                op(self.a_int, "a")
+
+    def test_unsupported_types_defer_to_reflected_ops(self):
+        """An operand type hurwitzint does not support should get to try its own reflected method"""
+
+        class Other:
+            def __rdivmod__(self, _: object) -> str:
+                return "rdivmod"
+
+            def __rfloordiv__(self, _: object) -> str:
+                return "rfloordiv"
+
+            def __rmod__(self, _: object) -> str:
+                return "rmod"
+
+            def __rtruediv__(self, _: object) -> str:
+                return "rtruediv"
+
+        other = Other()
+        assert divmod(self.a_int, other) == "rdivmod"
+        assert self.a_int // other == "rfloordiv"
+        assert self.a_int % other == "rmod"
+        assert self.a_int / other == "rtruediv"
+
 
 class TestRDiv(HurwitzIntTests):
     """Tests for rtruediv and rfloordiv"""
@@ -303,6 +331,13 @@ class TestRDiv(HurwitzIntTests):
                                         res_q, res_r = rdivmod(a, b)
 
                                         assert b * res_q + res_r == a
+
+    def test_unsupported_types_raise_type_error(self):
+        """An unsupported operand type should raise TypeError, not NotImplementedError"""
+        x = self.a_int
+        for method in (x.rdivmod, x.rfloordiv, x.rmod, x.rtruediv):
+            with pytest.raises(TypeError):
+                method("a")
 
 
 class TestIsUnit(HurwitzIntTests):
