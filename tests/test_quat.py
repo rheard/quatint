@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from hurwitz import HurwitzQuaternion
+from sympy import isprime
 
 import quatint.quat
 
@@ -1271,6 +1272,32 @@ class TestContent(HurwitzIntTests):
                 assert (k * x).content() == abs(k) * m
 
 
+class TestProd(HurwitzIntTests):
+    """Tests for prod_right and prod_left, which multiply in opposite orders"""
+
+    def test_order(self):
+        """prod_right multiplies left to right like math.prod, and prod_left puts each new factor on the left"""
+        a, b, c = self.a_int, self.b_int, hurwitzint(3, 5, 7, 9, half=True)
+
+        assert prod_right((a, b, c)) == a * b * c
+        assert prod_left((a, b, c)) == c * b * a
+        assert prod_right((a, b, c)) != prod_left((a, b, c))
+
+    def test_start(self):
+        """The start value ends up on the left for prod_right, and on the right for prod_left"""
+        a, b, c = self.a_int, self.b_int, hurwitzint(3, 5, 7, 9, half=True)
+
+        assert prod_right((a, b), start=c) == c * a * b
+        assert prod_left((a, b), start=c) == b * a * c
+
+    def test_empty(self):
+        """With nothing to multiply, the product is the start value, which defaults to 1"""
+        assert prod_right(()) == 1
+        assert prod_left(()) == 1
+        assert prod_right((), start=self.a_int) == self.a_int
+        assert prod_left((), start=self.a_int) == self.a_int
+
+
 class TestFactorRightDetail(HurwitzIntTests):
     """Tests for factor_right_detail"""
 
@@ -1311,11 +1338,23 @@ class TestFactorRightDetail(HurwitzIntTests):
                 assert moved.primes == factors.primes
                 assert moved.unit == u * factors.unit
 
+    def test_random_products(self):
+        """Factor seeded random products of bigger Hurwitz integers (norms up to about 10**20), some with content"""
+        rng = random.Random(9_000)
+        for bound in (10, 10**3, 10**5):
+            for _ in range(15):
+                n = self.rand_hurwitzint(rng, bound) * self.rand_hurwitzint(rng, bound)
+                if rng.random() < 0.3:
+                    n *= rng.randint(2, 30)
+
+                self.assert_factoring(n, n.factor_right_detail())
+
     def assert_factoring(self, n: hurwitzint, factors: NonCommutativeFactorization):
         """Validate everything about the factoring is correct"""
         ans = factors.prod_right()
 
         self.assert_equal(n, ans)
+        assert factors.prod() == n  # prod() multiplies a right factorization with prod_right
 
         # Validate the primes are sorted by norm
         norms = [abs(p) for p in factors.primes]
@@ -1373,6 +1412,24 @@ class TestFactorRight(HurwitzIntTests):
 
         self.assert_equal(n, ans)
 
+    def test_zero_units_and_primes(self):
+        """Zero, a unit, or a prime (anything with a prime norm) factors as just itself"""
+        primes = (hurwitzint(1, 1, 0, 0), hurwitzint(3, 1, 1, 1, half=True), hurwitzint(1, 1, 1, 2),
+                  hurwitzint(6, 0, 0, 1))
+        for n in (hurwitzint(0), *hurwitzint.UNITS, *primes):
+            assert n.factor_right() == (n,)
+
+    def test_random_products(self):
+        """For seeded random products, the factors multiply back with prod_right, and all but the first are primes"""
+        rng = random.Random(9_002)
+        for bound in (10, 10**3):
+            for _ in range(20):
+                n = self.rand_hurwitzint(rng, bound) * self.rand_hurwitzint(rng, bound) * rng.randint(1, 12)
+                factors = n.factor_right()
+
+                assert prod_right(factors) == n
+                assert all(isprime(abs(p)) for p in factors[1:])
+
 
 class TestFactorLeftDetail(HurwitzIntTests):
     """Tests for factor_left_detail"""
@@ -1414,11 +1471,23 @@ class TestFactorLeftDetail(HurwitzIntTests):
                 assert moved.primes == factors.primes
                 assert moved.unit == factors.unit * u
 
+    def test_random_products(self):
+        """Factor seeded random products of bigger Hurwitz integers (norms up to about 10**20), some with content"""
+        rng = random.Random(9_001)
+        for bound in (10, 10**3, 10**5):
+            for _ in range(15):
+                n = self.rand_hurwitzint(rng, bound) * self.rand_hurwitzint(rng, bound)
+                if rng.random() < 0.3:
+                    n *= rng.randint(2, 30)
+
+                self.assert_factoring(n, n.factor_left_detail())
+
     def assert_factoring(self, n: hurwitzint, factors: NonCommutativeFactorization):
         """Validate everything about the factoring is correct"""
         ans = factors.prod_left()
 
         self.assert_equal(n, ans)
+        assert factors.prod() == n  # prod() multiplies a left factorization with prod_left
 
         # Validate the primes are sorted by norm
         norms = [abs(p) for p in factors.primes]
@@ -1475,6 +1544,24 @@ class TestFactorLeft(HurwitzIntTests):
         ans = prod_left(factors)
 
         self.assert_equal(n, ans)
+
+    def test_zero_units_and_primes(self):
+        """Zero, a unit, or a prime (anything with a prime norm) factors as just itself"""
+        primes = (hurwitzint(1, 1, 0, 0), hurwitzint(3, 1, 1, 1, half=True), hurwitzint(1, 1, 1, 2),
+                  hurwitzint(6, 0, 0, 1))
+        for n in (hurwitzint(0), *hurwitzint.UNITS, *primes):
+            assert n.factor_left() == (n,)
+
+    def test_random_products(self):
+        """For seeded random products, the factors multiply back with prod_left, and all but the first are primes"""
+        rng = random.Random(9_003)
+        for bound in (10, 10**3):
+            for _ in range(20):
+                n = self.rand_hurwitzint(rng, bound) * self.rand_hurwitzint(rng, bound) * rng.randint(1, 12)
+                factors = n.factor_left()
+
+                assert prod_left(factors) == n
+                assert all(isprime(abs(p)) for p in factors[1:])
 
 
 class TestRepr(HurwitzIntTests):
