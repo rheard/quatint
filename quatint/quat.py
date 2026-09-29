@@ -58,6 +58,32 @@ def _round_div_ties_away_from_zero(a: int, b: int) -> int:
     return -((-a + (b // 2)) // b)
 
 
+def _nearest_with_parity(U: int, Q0: int, parity: int, n: int) -> tuple[int, int]:
+    """
+    Return (Q, metric) minimizing (Q*n - U)^2 subject to Q % 2 == parity,
+    given Q0, the nearest integer to U/n.
+
+    Returns:
+        tuple: The (Q, metric).
+    """
+    if parity == (Q0 & 1):
+        d = Q0 * n - U
+        return Q0, d * d
+
+    # Nearest integer with opposite parity must be Q0-1 or Q0+1.
+    Qm = Q0 - 1
+    Qp = Q0 + 1
+    dm = Qm * n - U
+    dp = Qp * n - U
+    mm = dm * dm
+    mp = dp * dp
+
+    # Deterministic tie-break: prefer the smaller Q (Qm) on equal metric.
+    if mm <= mp:
+        return Qm, mm
+    return Qp, mp
+
+
 class hurwitzint:
     """
     Hurwitz quaternion integer.
@@ -265,13 +291,12 @@ class hurwitzint:
         return result
 
     # region Euclidean division (Hurwitz order is norm-Euclidean)
-    def _division(
-            self,
-            num: hurwitzint,
-            divisor: hurwitzint,
-            divisor_norm: int,
-            remainder: Callable[[hurwitzint, hurwitzint, hurwitzint], hurwitzint] = lambda a, b, c: a - b * c) \
-            -> tuple[hurwitzint, hurwitzint]:
+    def _division(self,
+                  num: hurwitzint,
+                  divisor: hurwitzint,
+                  divisor_norm: int,
+                  *,
+                  right: bool = False) -> tuple[hurwitzint, hurwitzint]:
         """
         A shared division algorithm.
 
@@ -281,68 +306,50 @@ class hurwitzint:
 
         This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
 
+        Under mypyc this is a hot path (every gcd and factorization step runs through it), so it avoids closures,
+            lambdas and star-args, which compile to slow generic Python calls.
+
         Args:
             num: The number to divide.
             divisor: The divisor.
             divisor_norm: The divisor norm. Should be checked for 0 already!
-            remainder: A callable to compute the remainder.
+            right: Divide on the right (self = divisor*q + r), rather than on the left (self = q*divisor + r).
 
         Returns:
             tuple: The quotient and remainder.
         """
         n = divisor_norm
+        Ua, Ub, Uc, Ud = num._a, num._b, num._c, num._d
 
         # Unconstrained nearest integers to U_i / n (ties away from zero).
-        A0 = _round_div_ties_away_from_zero(num._a, n)
-        B0 = _round_div_ties_away_from_zero(num._b, n)
-        C0 = _round_div_ties_away_from_zero(num._c, n)
-        D0 = _round_div_ties_away_from_zero(num._d, n)
+        A0 = _round_div_ties_away_from_zero(Ua, n)
+        B0 = _round_div_ties_away_from_zero(Ub, n)
+        C0 = _round_div_ties_away_from_zero(Uc, n)
+        D0 = _round_div_ties_away_from_zero(Ud, n)
 
-        # Fast path: already in the Hurwitz parity lattice.
         if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
+            # Fast path: already in the Hurwitz parity lattice.
             q = self._make(A0, B0, C0, D0)
-            r = remainder(self, q, divisor)
-            return q, r
+        else:
+            # Compare best all-even vs best all-odd. The metric is a sum over the components,
+            #   so each candidate is just the nearest integer of its parity, one component at a time.
+            Ae, mAe = _nearest_with_parity(Ua, A0, 0, n)
+            Be, mBe = _nearest_with_parity(Ub, B0, 0, n)
+            Ce, mCe = _nearest_with_parity(Uc, C0, 0, n)
+            De, mDe = _nearest_with_parity(Ud, D0, 0, n)
 
-        def best_with_parity(U: int, Q0: int, parity: int) -> tuple[int, int]:
-            """
-            Return (Q, metric) minimizing (Q*n - U)^2 subject to Q % 2 == parity,
-            given a nearby integer Q0 ~ U/n.
+            Ao, mAo = _nearest_with_parity(Ua, A0, 1, n)
+            Bo, mBo = _nearest_with_parity(Ub, B0, 1, n)
+            Co, mCo = _nearest_with_parity(Uc, C0, 1, n)
+            Do, mDo = _nearest_with_parity(Ud, D0, 1, n)
 
-            Returns:
-                tuple: The (Q, metric).
-            """
-            if parity == (Q0 & 1):
-                d = Q0 * n - U
-                return Q0, d * d
+            # Deterministic tie-break if equal metric: prefer even.
+            if mAe + mBe + mCe + mDe <= mAo + mBo + mCo + mDo:
+                q = self._make(Ae, Be, Ce, De)
+            else:
+                q = self._make(Ao, Bo, Co, Do)
 
-            # Nearest integer with opposite parity must be Q0-1 or Q0+1.
-            Qm = Q0 - 1
-            Qp = Q0 + 1
-            dm = Qm * n - U
-            dp = Qp * n - U
-            mm = dm * dm
-            mp = dp * dp
-
-            # Deterministic tie-break: prefer the smaller Q (Qm) on equal metric.
-            if mm <= mp:
-                return Qm, mm
-            return Qp, mp
-
-        def build_candidate(parity: int) -> tuple[int, int, int, int, int]:
-            A, mA = best_with_parity(num._a, A0, parity)
-            B, mB = best_with_parity(num._b, B0, parity)
-            C, mC = best_with_parity(num._c, C0, parity)
-            D, mD = best_with_parity(num._d, D0, parity)
-            return A, B, C, D, (mA + mB + mC + mD)
-
-        # Compare best all-even vs best all-odd.
-        *e, M_e = build_candidate(0)
-        *o, M_o = build_candidate(1)
-
-        # Deterministic tie-break if equal metric: prefer even.
-        q = self._make(*e) if M_e <= M_o else self._make(*o)
-        r = remainder(self, q, divisor)
+        r = self - divisor * q if right else self - q * divisor
         return q, r
 
     # region Left-division helpers (non-commutative!)
@@ -454,7 +461,7 @@ class hurwitzint:
         # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other)
         num = other.conjugate() * self
 
-        return self._division(num, other, n, lambda a, b, c: a - c * b)
+        return self._division(num, other, n, right=True)
 
     def rtruediv(self, other: OP_TYPES) -> hurwitzint:
         """A version of __truediv__ for right-division"""
