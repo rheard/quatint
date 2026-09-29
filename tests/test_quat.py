@@ -6,8 +6,9 @@ import os
 import pickle
 import random
 
+from fractions import Fraction
 from itertools import product
-from math import gcd, isqrt
+from math import floor, gcd, isqrt
 from pathlib import Path
 
 import pytest
@@ -469,6 +470,40 @@ class TestDiv(HurwitzIntTests):
             self.assert_equal(q, float(i) // self.b_int)
             self.assert_equal(r, float(i) % self.b_int)
 
+    def test_int_and_float_divisors(self):
+        """An int or float divisor divides like the hurwitzint it equals, and the same on either side"""
+        for a in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(-17, 4, 0, 23)):
+            for m in (1, -1, 2, 3, -3, 7, 3.0, -2.0):
+                expected = divmod(a, hurwitzint(m))
+
+                assert divmod(a, m) == expected
+                assert a // m == expected[0]
+                assert a / m == expected[0]
+                assert a % m == expected[1]
+
+                # An integer commutes with everything, so right-division by one is the same
+                assert rdivmod(a, m) == expected
+
+    def test_truediv_is_floordiv(self):
+        """/ gives the same Euclidean quotient as //, with a hurwitzint, int or float on the left"""
+        for b in self.division_divisors:
+            for a in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(-17, 4, 0, 23)):
+                assert a / b == a // b
+
+            for i in (-7, 0, 5, 12):
+                self.assert_equal(hurwitzint(i) // b, i / b)
+                self.assert_equal(hurwitzint(i) // b, float(i) / b)
+
+    def test_divide_by_zero(self):
+        """Dividing by a zero hurwitzint, int or float raises ZeroDivisionError, with a hurwitzint on either side"""
+        for op in (divmod, operator.floordiv, operator.mod, operator.truediv):
+            for zero in (hurwitzint(0), 0, 0.0):
+                with pytest.raises(ZeroDivisionError):
+                    op(self.a_int, zero)
+
+            with pytest.raises(ZeroDivisionError):
+                op(5, hurwitzint(0))
+
     def test_unsupported_reversed_types_raise_type_error(self):
         """An unsupported left operand should raise TypeError, like it does with int"""
         for op in (divmod, operator.floordiv, operator.mod, operator.truediv):
@@ -556,12 +591,50 @@ class TestRDiv(HurwitzIntTests):
             for a in self.division_divisors:
                 assert rdivmod(a, u) == (u.inverse() * a, 0)
 
+    def test_right_helpers_match_rdivmod(self):
+        """The rfloordiv and rtruediv methods give the quotient from rdivmod, and rmod gives its remainder"""
+        for b in self.division_divisors:
+            for a in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(-17, 4, 0, 23)):
+                q, r = a.rdivmod(b)
+
+                assert a.rfloordiv(b) == q
+                assert a.rtruediv(b) == q
+                assert a.rmod(b) == r
+
+    def test_divide_by_zero(self):
+        """Right-dividing by zero (a hurwitzint, int or float) raises ZeroDivisionError from every method"""
+        x = self.a_int
+        for method in (x.rdivmod, x.rfloordiv, x.rmod, x.rtruediv):
+            for zero in (hurwitzint(0), 0, 0.0):
+                with pytest.raises(ZeroDivisionError):
+                    method(zero)
+
     def test_unsupported_types_raise_type_error(self):
         """An unsupported operand type should raise TypeError, not NotImplementedError"""
         x = self.a_int
         for method in (x.rdivmod, x.rfloordiv, x.rmod, x.rtruediv):
             with pytest.raises(TypeError):
                 method("a")
+
+
+class TestRoundDivTiesAwayFromZero:
+    """Tests for _round_div_ties_away_from_zero, the rounding that every division starts from"""
+
+    def test_matches_exact_rounding(self):
+        """a/b rounds to the nearest integer, with exact halves going away from zero, for small and big values"""
+        values = (*range(-60, 61), 10**30 + 5, -(10**30) - 5, 2**64 + 1, -(2**64) - 1)
+        for b in (*range(1, 13), 2**64):
+            for a in values:
+                x = Fraction(a, b)
+                nearest = floor(abs(x) + Fraction(1, 2))
+
+                assert quatint.quat._round_div_ties_away_from_zero(a, b) == (nearest if x >= 0 else -nearest)
+
+    def test_divisor_must_be_positive(self):
+        """The divisor b has to be positive (it is always a norm), and anything else raises ValueError"""
+        for b in (0, -1, -7):
+            with pytest.raises(ValueError, match="b must be > 0"):
+                quatint.quat._round_div_ties_away_from_zero(5, b)
 
 
 class TestIsUnit(HurwitzIntTests):
