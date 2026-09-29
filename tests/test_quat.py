@@ -119,6 +119,32 @@ class TestEqualityWithNumbers(HurwitzIntTests):
         assert len(set(equal_values)) == 1
 
 
+class TestInit(HurwitzIntTests):
+    """Tests for __init__"""
+
+    def test_floats_are_truncated(self):
+        """Float components are truncated with int(), the same in the compiled and pure-Python builds"""
+        assert hurwitzint(1.9, -2.9, 3.0, 0.5) == hurwitzint(1, -2, 3, 0)
+        assert hurwitzint(0.5, 0.5, 0.5, 0.5) == 0
+        assert hurwitzint(3.0, -5.0, 7.9, 9.0, half=True) == hurwitzint(3, -5, 7, 9, half=True)
+
+    def test_bools_become_ints(self):
+        """Bools (an int subclass) are stored as plain ints, just like int() makes them"""
+        half_unit = hurwitzint(True, True, True, True, half=True)  # ruff: ignore[boolean-positional-value-in-call]
+        lipschitz = hurwitzint(True, False, True, False)  # ruff: ignore[boolean-positional-value-in-call]
+
+        for x in (half_unit, lipschitz):
+            assert all(type(n) is int for n in x)
+
+        assert repr(half_unit) == "(1+i+j+k)/2"
+
+    def test_big_ints_are_exact(self):
+        """Components far past 2**53 come through exactly, so ints are never squeezed through a float"""
+        for n in (2**53 + 1, 2**64 + 1, -(2**70) - 1, 10**30 + 7):
+            assert list(hurwitzint(n, -n, n + 2, 3)) == [2 * n, -2 * n, 2 * n + 4, 6]
+            assert list(hurwitzint(2 * n + 1, 1, -1, 3, half=True)) == [2 * n + 1, 1, -1, 3]
+
+
 class TestImmutable(HurwitzIntTests):
     """Tests that a hurwitzint cannot be changed once it is made"""
 
@@ -283,6 +309,27 @@ class TestMul(HurwitzIntTests):
             res_int = float(i) * self.a_int
 
             self.assert_equal((2 * i, 4 * i, 6 * i, 8 * i), res_int)
+
+
+class TestPow(HurwitzIntTests):
+    """Tests for __pow__"""
+
+    def test_pow(self):
+        """Powers match repeated multiplication, and stay exact for big results"""
+        x = hurwitzint(1, 2, 3, 4)
+        assert x ** 0 == 1
+        assert x ** 1 == x
+        assert x ** 3 == x * x * x
+
+        # (1+i)**2 == 2i, so (1+i)**100 == (2i)**50 == -2**50
+        assert hurwitzint(1, 1, 0, 0) ** 100 == -(2**50)
+
+    def test_float_exponent_is_truncated(self):
+        """A float exponent is truncated with int(), like any other float meeting a hurwitzint"""
+        x = hurwitzint(1, 2, 3, 4)
+        assert pow(x, 2.0) == x * x
+        assert pow(x, 2.9) == x * x
+        assert pow(x, 0.5) == 1
 
 
 class TestDiv(HurwitzIntTests):

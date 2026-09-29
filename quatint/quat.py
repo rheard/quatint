@@ -88,10 +88,10 @@ class hurwitzint:
 
     def __init__(
         self,
-        a: int = 0,
-        b: int = 0,
-        c: int = 0,
-        d: int = 0,
+        a: OTHER_OP_TYPES = 0,
+        b: OTHER_OP_TYPES = 0,
+        c: OTHER_OP_TYPES = 0,
+        d: OTHER_OP_TYPES = 0,
         *,
         half: bool = False,
     ) -> None:
@@ -105,6 +105,7 @@ class hurwitzint:
                 If half=True: interpreted as numerator components for /2:
                     q = (a + b*i + c*j + d*k) / 2
                 (So (1+i+j+k)/2 is hurwitzint(1,1,1,1, half=True).)
+                Floats are truncated with int(), like everywhere else a float meets a hurwitzint.
             b: See a.
             c: See a.
             d: See a.
@@ -114,7 +115,12 @@ class hurwitzint:
         Raises:
             ValueError: If parity is incorrect.
         """
-        a0, b0, c0, d0 = int(a), int(b), int(c), int(d)
+        # This runs for the result of every operation (see _make), and under mypyc int() is slow on an argument
+        #   that may also be a float, so plain ints skip it (type() rather than isinstance(), so bools become ints)
+        a0 = a if type(a) is int else int(a)
+        b0 = b if type(b) is int else int(b)
+        c0 = c if type(c) is int else int(c)
+        d0 = d if type(d) is int else int(d)
 
         if not half:
             a0 *= 2
@@ -240,7 +246,8 @@ class hurwitzint:
     def __rmul__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         return self.__mul__(other)
 
-    def __pow__(self, exp: int) -> hurwitzint:
+    # Not just `exp: float`, since mypyc would turn an int exponent into a double and lose every bit past 2**53
+    def __pow__(self, exp: OTHER_OP_TYPES) -> hurwitzint:
         e = int(exp)
         if e < 0:
             raise ValueError("Negative powers not supported")
