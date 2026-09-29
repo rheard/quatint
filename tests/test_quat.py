@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 import os
 
 from math import isqrt
@@ -235,6 +236,38 @@ class TestDiv(HurwitzIntTests):
                                         res_q, res_r = divmod(a, b)
 
                                         assert res_q * b + res_r == a
+
+    def test_divmod_int_reversed(self):
+        """Test divmod(int, hurwitzint), int // hurwitzint and int % hurwitzint"""
+        for b in (self.b_int, hurwitzint(3, 5, 7, 9, half=True)):
+            for i in range(-60, 61):
+                q, r = divmod(i, b)
+                res_q, res_r = divmod(hurwitzint(i), b)
+
+                self.assert_equal(res_q, q)
+                self.assert_equal(res_r, r)
+                self.assert_equal(q, i // b)
+                self.assert_equal(r, i % b)
+
+                assert q * b + r == hurwitzint(i)
+                assert 2 * abs(r) <= abs(b)
+
+    def test_divmod_float_reversed(self):
+        """Test divmod(float, hurwitzint), float // hurwitzint and float % hurwitzint"""
+        for i in range(-60, 61):
+            q, r = divmod(float(i), self.b_int)
+            res_q, res_r = divmod(hurwitzint(i), self.b_int)
+
+            self.assert_equal(res_q, q)
+            self.assert_equal(res_r, r)
+            self.assert_equal(q, float(i) // self.b_int)
+            self.assert_equal(r, float(i) % self.b_int)
+
+    def test_unsupported_reversed_types_raise_type_error(self):
+        """An unsupported left operand should raise TypeError, like it does with int"""
+        for op in (divmod, operator.floordiv, operator.mod, operator.truediv):
+            with pytest.raises(TypeError):
+                op(None, self.b_int)
 
 
 class TestRDiv(HurwitzIntTests):

@@ -347,6 +347,13 @@ class hurwitzint:
 
         return self._division(num, other, n)
 
+    def __rdivmod__(self, other: OTHER_OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+        if isinstance(other, _OTHER_OP_TYPES):
+            new_other = self._from_obj(other)
+            return new_other.__divmod__(self)
+
+        return NotImplemented
+
     def __truediv__(self, other: OP_TYPES) -> hurwitzint:
         # mirror QuadInt: treat / as Euclidean division in this domain
         return self.__floordiv__(other)
@@ -372,6 +379,13 @@ class hurwitzint:
     def __mod__(self, other: OP_TYPES) -> hurwitzint:
         _, r = divmod(self, other)
         return r
+
+    def __rmod__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+        if isinstance(other, _OTHER_OP_TYPES):
+            new_other = self._from_obj(other)
+            return new_other.__mod__(self)
+
+        return NotImplemented
     # endregion
 
     # region Right-division helpers
