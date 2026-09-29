@@ -290,6 +290,10 @@ class hurwitzint:
 
     # Not just `exp: float`, since mypyc would turn an int exponent into a double and lose every bit past 2**53
     def __pow__(self, exp: OTHER_OP_TYPES) -> hurwitzint:
+        # The mypyc build rejects anything else before getting here, so this makes pure Python match it
+        if not isinstance(exp, _OTHER_OP_TYPES):
+            return NotImplemented
+
         e = int(exp)
         if e < 0:
             raise ValueError("Negative powers not supported")

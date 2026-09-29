@@ -389,6 +389,19 @@ class TestPow(HurwitzIntTests):
         assert pow(x, 2.9) == x * x
         assert pow(x, 0.5) == 1
 
+    def test_non_number_exponents(self):
+        """A non-number exponent raises TypeError in both builds, and a type with its own __rpow__ gets to handle it"""
+        x = hurwitzint(1, 2, 3, 4)
+        for exp in ("2", "a", None, [2]):
+            with pytest.raises(TypeError):
+                pow(x, exp)
+
+        class Other:
+            def __rpow__(self, _: object) -> str:
+                return "rpow"
+
+        assert pow(x, Other()) == "rpow"
+
 
 class TestDiv(HurwitzIntTests):
     """Tests for __truediv__ and __floordiv__"""
