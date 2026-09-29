@@ -750,22 +750,41 @@ class hurwitzint:
             The canonical one has the largest numerator tuple: the largest real part, with ties going to the
             largest i, then j, then k part. So for example a nonzero integer always comes out positive.
 
+        The candidates are compared as plain int numerators (see _mul_numerators), so the only hurwitzint this
+            builds is the answer. (The 24 associates of a nonzero value all differ, so the largest one is unique.)
+
         Returns:
              tuple: (p_canon, u) such that p_canon = p*u (direction="right") or p_canon = u*p (direction="left").
         """
-        best = None
-        best_u = None
+        A, B, C, D = self._a, self._b, self._c, self._d
+        right = direction == "right"
+
+        # Every candidate's real part is at least -(|A| + |B| + |C| + |D|), so the first candidate always beats this
+        Ba = -(abs(A) + abs(B) + abs(C) + abs(D)) - 1
+        Bb = Bc = Bd = 0
+        best_u = hurwitzint.UNITS[0]
         for u in hurwitzint.UNITS:
-            cand = self * u if direction == "right" else u * self
-            key = tuple(cand)
-            if best is None or key > best:
-                best = key
+            if right:
+                Pa, Pb, Pc, Pd = _mul_numerators(A, B, C, D, u._a, u._b, u._c, u._d)
+            else:
+                Pa, Pb, Pc, Pd = _mul_numerators(u._a, u._b, u._c, u._d, A, B, C, D)
+
+            # Compare the numerator tuples (Pa, Pb, Pc, Pd) > (Ba, Bb, Bc, Bd) one part at a time,
+            #   since mypyc compiles a tuple comparison into a slow generic one
+            if Pa != Ba:
+                larger = Pa > Ba
+            elif Pb != Bb:
+                larger = Pb > Bb
+            elif Pc != Bc:
+                larger = Pc > Bc
+            else:
+                larger = Pd > Bd
+
+            if larger:
+                Ba, Bb, Bc, Bd = Pa, Pb, Pc, Pd
                 best_u = u
 
-        assert best_u is not None
-        if direction == "right":
-            return self * best_u, best_u
-        return best_u * self, best_u
+        return self._make(Ba, Bb, Bc, Bd), best_u
 
     def _extract_right_prime(self, p: int) -> hurwitzint:
         """
