@@ -135,6 +135,14 @@ class TestEq(HurwitzIntTests):
         assert self.a_int == c
         assert self.b_int != c
 
+    def test_other_types_are_never_equal(self):
+        """A hurwitzint never equals something that is not a number, not even a sequence of its own parts"""
+        x = hurwitzint(1, 2, 3, 4)
+        for other in ("x", None, [2, 4, 6, 8], (2, 4, 6, 8), object()):
+            assert x != other
+            assert other != x
+            assert not operator.eq(x, other)
+
 
 class TestEqualityWithNumbers(HurwitzIntTests):
     """Tests for __eq__ and __hash__ against plain Python numbers"""
@@ -202,6 +210,22 @@ class TestInit(HurwitzIntTests):
             assert list(hurwitzint(n, -n, n + 2, 3)) == [2 * n, -2 * n, 2 * n + 4, 6]
             assert list(hurwitzint(2 * n + 1, 1, -1, 3, half=True)) == [2 * n + 1, 1, -1, 3]
 
+    def test_parity_is_checked(self):
+        """Numerators given with half=True must be all even or all odd, since anything else is not a Hurwitz integer"""
+        for parts in ((1, 2, 3, 4), (1, 1, 1, 2), (1, 0, 0, 0), (2, 3, 2, 2)):
+            with pytest.raises(ValueError, match="same parity"):
+                hurwitzint(*parts, half=True)
+
+        # Without half=True the parts are whole numbers, so any four of them make a Hurwitz integer
+        assert list(hurwitzint(1, 0, 0, 0)) == [2, 0, 0, 0]
+
+    def test_missing_parts_are_zero(self):
+        """Any parts left out are zero"""
+        assert hurwitzint() == 0
+        assert list(hurwitzint()) == [0, 0, 0, 0]
+        assert hurwitzint(5) == 5
+        assert list(hurwitzint(5, -6)) == [10, -12, 0, 0]
+
 
 class TestImmutable(HurwitzIntTests):
     """Tests that a hurwitzint cannot be changed once it is made"""
@@ -227,6 +251,36 @@ class TestImmutable(HurwitzIntTests):
             assert copy.copy(x) == x
             assert copy.deepcopy(x) == x
             assert pickle.loads(pickle.dumps(x)) == x
+
+
+class TestComponents(HurwitzIntTests):
+    """Tests for reading a hurwitzint's parts: a, b, c and d, len, iteration, indexing, den and is_lipschitz"""
+
+    def test_parts_are_numerators(self):
+        """However they are read, the parts are the numerators over 2, and they rebuild the value with half=True"""
+        for x, numerators in ((hurwitzint(1, -2, 3, 0), [2, -4, 6, 0]),
+                              (hurwitzint(3, -5, 7, 9, half=True), [3, -5, 7, 9])):
+            assert len(x) == 4
+            assert list(x) == numerators
+            assert [x[0], x[1], x[2], x[3]] == numerators
+            assert [x.a, x.b, x.c, x.d] == numerators
+            assert hurwitzint(*x, half=True) == x
+
+    def test_index_out_of_range(self):
+        """Indexing past the four parts raises IndexError"""
+        x = hurwitzint(1, 2, 3, 4)
+        for idx in (4, 5, 100):
+            with pytest.raises(IndexError):
+                operator.getitem(x, idx)
+
+    def test_den_and_is_lipschitz(self):
+        """Every part is over den == 2, and is_lipschitz is whether they all come out whole"""
+        for x in (hurwitzint(1, -2, 3, 0), hurwitzint(0), hurwitzint(3, -5, 7, 9, half=True)):
+            assert x.den == 2
+            assert x.is_lipschitz == all(n % x.den == 0 for n in x)
+
+        assert hurwitzint(1, 2, 3, 4).is_lipschitz
+        assert not hurwitzint(1, 1, 1, 1, half=True).is_lipschitz
 
 
 class TestAdd(HurwitzIntTests):
@@ -367,6 +421,38 @@ class TestMul(HurwitzIntTests):
             res_int = float(i) * self.a_int
 
             self.assert_equal((2 * i, 4 * i, 6 * i, 8 * i), res_int)
+
+
+class TestUnsupportedOperands(HurwitzIntTests):
+    """Tests for +, - and * with operand types hurwitzint does not support"""
+
+    def test_raise_type_error(self):
+        """An unsupported operand raises TypeError, on either side of +, - or *, as it would with an int"""
+        for op in (operator.add, operator.sub, operator.mul):
+            for other in (None, "a", [1]):
+                with pytest.raises(TypeError):
+                    op(self.a_int, other)
+
+                with pytest.raises(TypeError):
+                    op(other, self.a_int)
+
+    def test_defer_to_reflected_ops(self):
+        """An operand type hurwitzint does not support gets to try its own reflected method"""
+
+        class Other:
+            def __radd__(self, _: object) -> str:
+                return "radd"
+
+            def __rsub__(self, _: object) -> str:
+                return "rsub"
+
+            def __rmul__(self, _: object) -> str:
+                return "rmul"
+
+        other = Other()
+        assert self.a_int + other == "radd"
+        assert self.a_int - other == "rsub"
+        assert self.a_int * other == "rmul"
 
 
 class TestPow(HurwitzIntTests):
@@ -1327,3 +1413,15 @@ class TestRepr(HurwitzIntTests):
         assert repr(hurwitzint(2, 0, 0, 0)) == "(2+0i+0j+0k)"
         assert repr(hurwitzint(1, 1, 1, 1)) == "(1+i+j+k)"
         assert repr(hurwitzint(-1, -1, -1, -1)) == "(-1-i-j-k)"
+
+    def test_repr_of_k(self):
+        """Like Python's 2j, a whole multiple of k shows without parentheses, and k or -k without the 1"""
+        assert repr(hurwitzint(0, 0, 0, 1)) == "k"
+        assert repr(hurwitzint(0, 0, 0, -1)) == "-k"
+        assert repr(hurwitzint(0, 0, 0, 12)) == "12k"
+
+    def test_repr_signs(self):
+        """A negative part shows a minus sign in place of the plus, in Lipschitz and half-integer values alike"""
+        assert repr(hurwitzint(-1, -3, 5, -7, half=True)) == "(-1-3i+5j-7k)/2"
+        assert repr(hurwitzint(-2, 1, -1, 0)) == "(-2+i-j+0k)"
+        assert repr(hurwitzint(10**20, -1, 0, 3)) == f"({10**20}-i+0j+3k)"
