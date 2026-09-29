@@ -6,8 +6,6 @@ from typing import Callable, ClassVar, Generator, Iterable, Iterator, Literal, U
 
 from sympy import factorint
 
-from quatint.utils import cache_generator
-
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
@@ -56,84 +54,6 @@ def _round_div_ties_away_from_zero(a: int, b: int) -> int:
 
     # a < 0
     return -((-a + (b // 2)) // b)
-
-
-@cache_generator
-def uv_for_prime(p: int) -> Generator[tuple[int, int], None, None]:
-    """
-    Find u,v with 1 + u^2 + v^2 ≡ 0 (mod p).
-        Deterministic search over u with Tonelli sqrt for v.
-
-    Yields:
-        tuple: The found u,v where 1 + u^2 + v^2 ≡ 0 (mod p).
-
-    Raises:
-        ArithmeticError: If we fail to find a good u,v pair.
-    """
-    p = int(p)
-    if p == 2:
-        yield 0, 1
-        return
-
-    found = False
-    for u in range(p):
-        t = (-1 - (u * u)) % p
-        v = mod_sqrt_prime(t, p)
-        if v is not None:
-            found = True
-            yield u, v
-
-    if not found:
-        raise ArithmeticError("Failed to find u,v (unexpected for prime p)")
-
-
-def mod_sqrt_prime(n: int, p: int) -> int | None:
-    """Return x such that x*x % p == n % p, or None if no sqrt exists. p must be prime."""
-    n %= p
-    if n == 0:
-        return 0
-
-    if p == 2:
-        return n
-
-    # Legendre symbol test: residue iff n^((p-1)/2) == 1 (mod p)
-    if pow(n, (p - 1) // 2, p) != 1:
-        return None
-
-    # Fast path when p ≡ 3 (mod 4)
-    if p % 4 == 3:
-        return pow(n, (p + 1) // 4, p)
-
-    # Tonelli-Shanks
-    q = p - 1
-    s = 0
-    while q % 2 == 0:
-        s += 1
-        q //= 2
-
-    z = 2
-    while pow(z, (p - 1) // 2, p) != p - 1:
-        z += 1
-
-    m = s
-    c = pow(z, q, p)
-    t = pow(n, q, p)
-    r = pow(n, (q + 1) // 2, p)
-
-    while t != 1:
-        i = 1
-        t2i = (t * t) % p
-        while i < m and t2i != 1:
-            t2i = (t2i * t2i) % p
-            i += 1
-
-        b = pow(c, 1 << (m - i - 1), p)
-        r = (r * b) % p
-        c = (b * b) % p
-        t = (t * c) % p
-        m = i
-
-    return r
 
 
 class hurwitzint:

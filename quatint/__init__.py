@@ -5,5 +5,4 @@ from quatint.quat import (
     prod_left as prod_left,
     prod_right as prod_right,
     rdivmod as rdivmod,
-    uv_for_prime as uv_for_prime,
 )
