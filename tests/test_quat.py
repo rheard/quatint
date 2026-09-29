@@ -240,7 +240,7 @@ class TestMul(HurwitzIntTests):
             self.assert_equal((2 * i, 4 * i, 6 * i, 8 * i), res_int)
 
     def test_mul_float_reversed(self):
-        """Test float * complexint"""
+        """Test float * hurwitzint"""
         for i in range(100):
             res_int = float(i) * self.a_int
 
@@ -251,7 +251,7 @@ class TestDiv(HurwitzIntTests):
     """Tests for __truediv__ and __floordiv__"""
 
     def test_div(self):
-        """Test complexint / complexint"""
+        """Test hurwitzint / hurwitzint"""
         res_q, res_r = self.a.euclidean_division(self.b)
         res_int_q, res_int_r = divmod(self.a_int, self.b_int)
 
@@ -343,7 +343,7 @@ class TestRDiv(HurwitzIntTests):
     """Tests for rtruediv and rfloordiv"""
 
     def test_rdiv(self):
-        r"""Test complexint \ complexint"""
+        r"""Test hurwitzint \ hurwitzint"""
         g = hurwitzint(1, 0, 0, 1)
         i = hurwitzint(0, 1, 0, 0)
 

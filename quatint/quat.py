@@ -150,7 +150,7 @@ class hurwitzint:
 
     @property
     def den(self) -> int:
-        """Static determinant, because everything is doubled under the hood anyway"""
+        """Static denominator, because everything is doubled under the hood anyway"""
         return 2
 
     def conjugate(self) -> hurwitzint:
@@ -225,11 +225,11 @@ class hurwitzint:
         base: hurwitzint = self
         while e:
             if e & 1:
-                result = result * base
+                result *= base
 
             e >>= 1
             if e:
-                base = base * base
+                base *= base
 
         return result
 
@@ -261,7 +261,7 @@ class hurwitzint:
         """
         n = divisor_norm
 
-        # Unconstrained nearest integers to U_i / n (ties away from zero, matching your current behavior).
+        # Unconstrained nearest integers to U_i / n (ties away from zero).
         A0 = _round_div_ties_away_from_zero(num.a, n)
         B0 = _round_div_ties_away_from_zero(num.b, n)
         C0 = _round_div_ties_away_from_zero(num.c, n)
