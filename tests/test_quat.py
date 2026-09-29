@@ -3,6 +3,7 @@ from __future__ import annotations
 import operator
 import os
 
+from itertools import product
 from math import isqrt
 from pathlib import Path
 
@@ -54,6 +55,15 @@ class HurwitzIntTests:
         assert isinstance(res_int.d, int)
 
         assert isinstance(res_int, hurwitzint)
+
+    @staticmethod
+    def wide_search_values():
+        """Every Lipschitz integer with components in [-3, 3], and every half-integer with numerators in [-5, 5]"""
+        for a, b, c, d in product(range(-3, 4), repeat=4):
+            yield hurwitzint(a, b, c, d)
+
+        for a, b, c, d in product(range(-5, 6, 2), repeat=4):
+            yield hurwitzint(a, b, c, d, half=True)
 
 
 class TestEq(HurwitzIntTests):
@@ -672,16 +682,33 @@ class TestFactorRightDetail(HurwitzIntTests):
         n = hurwitzint(2, 3, 4, 53)
         self.assert_factoring(n, n.factor_right_detail())
 
-        # This fails to have a norm-sorted prime factorization if metacommutation has not been implimented
+        # This comes out unsorted by norm if primes are extracted smallest norm first
         n = hurwitzint(1, 1, 1, 6)
         self.assert_factoring(n, n.factor_right_detail())
 
-        # This fails to factor after metacommutation was implemented due to a failed metacommutation swap. Fix it!
+        # This once broke a metacommutation swap, back when primes were sorted by swapping them
         n = hurwitzint(1, 1, 2, 15)
         self.assert_factoring(n, n.factor_right_detail())
 
         n = hurwitzint(17 * 31, 0, 0, 0)
         self.assert_factoring(n, n.factor_right_detail())
+
+    def test_wide_search(self):
+        """Validate factoring every small Lipschitz and half-integer Hurwitz integer, negative components included"""
+        for n in self.wide_search_values():
+            self.assert_factoring(n, n.factor_right_detail())
+
+    def test_normal_form(self):
+        """A unit on the left only changes the leading unit and never the primes, so this is a normal form"""
+        for n in (self.b_int, hurwitzint(2, 3, 4, 53), hurwitzint(1, 1, 2, 15), hurwitzint(6, 2, 4, 0),
+                  hurwitzint(4, 5, 22, 50), hurwitzint(3, 5, 7, 9, half=True) * self.a_int):
+            factors = n.factor_right_detail()
+            for u in hurwitzint.UNITS:
+                moved = (u * n).factor_right_detail()
+
+                assert moved.content == factors.content
+                assert moved.primes == factors.primes
+                assert moved.unit == u * factors.unit
 
     def assert_factoring(self, n: hurwitzint, factors: NonCommutativeFactorization):
         """Validate everything about the factoring is correct"""
@@ -689,7 +716,7 @@ class TestFactorRightDetail(HurwitzIntTests):
 
         self.assert_equal(n, ans)
 
-        # Validate metacommutation by verifying the norms are sorted
+        # Validate the primes are sorted by norm
         norms = [abs(p) for p in factors.primes]
         assert norms == sorted(norms)
 
@@ -736,23 +763,10 @@ class TestFactorRight(HurwitzIntTests):
         """Validate factor_right does not apply scalar content more than once."""
         n = hurwitzint(6, 2, 4, 0)
 
-        factors = n.factor_right(canonical=False)
+        factors = n.factor_right()
 
-        assert n.factor_right_detail(canonical=False).content > 1
-        assert len(n.factor_right_detail(canonical=False).primes) > 1
-
-        ans = prod_right(factors)
-
-        self.assert_equal(n, ans)
-
-    def test_canonical_with_content_and_multiple_factors(self):
-        """Validate canonical factor_right works when scalar content is present."""
-        n = hurwitzint(6, 2, 4, 0)
-
-        factors = n.factor_right(canonical=True)
-
-        assert n.factor_right_detail(canonical=True).content > 1
-        assert len(n.factor_right_detail(canonical=True).primes) > 1
+        assert n.factor_right_detail().content > 1
+        assert len(n.factor_right_detail().primes) > 1
 
         ans = prod_right(factors)
 
@@ -771,16 +785,33 @@ class TestFactorLeftDetail(HurwitzIntTests):
         n = hurwitzint(2, 3, 4, 53)
         self.assert_factoring(n, n.factor_left_detail())
 
-        # This fails to have a norm-sorted prime factorization if metacommutation has not been implimented
+        # This comes out unsorted by norm if primes are extracted smallest norm first
         n = hurwitzint(1, 1, 1, 6)
         self.assert_factoring(n, n.factor_left_detail())
 
-        # This fails to factor after metacommutation was implemented due to a failed metacommutation swap. Fix it!
+        # This once broke a metacommutation swap, back when primes were sorted by swapping them
         n = hurwitzint(1, 1, 2, 15)
         self.assert_factoring(n, n.factor_left_detail())
 
         n = hurwitzint(17 * 31, 0, 0, 0)
         self.assert_factoring(n, n.factor_left_detail())
+
+    def test_wide_search(self):
+        """Validate factoring every small Lipschitz and half-integer Hurwitz integer, negative components included"""
+        for n in self.wide_search_values():
+            self.assert_factoring(n, n.factor_left_detail())
+
+    def test_normal_form(self):
+        """A unit on the right only changes the trailing unit and never the primes, so this is a normal form"""
+        for n in (self.b_int, hurwitzint(2, 3, 4, 53), hurwitzint(1, 1, 2, 15), hurwitzint(6, 2, 4, 0),
+                  hurwitzint(4, 5, 22, 50), hurwitzint(3, 5, 7, 9, half=True) * self.a_int):
+            factors = n.factor_left_detail()
+            for u in hurwitzint.UNITS:
+                moved = (n * u).factor_left_detail()
+
+                assert moved.content == factors.content
+                assert moved.primes == factors.primes
+                assert moved.unit == factors.unit * u
 
     def assert_factoring(self, n: hurwitzint, factors: NonCommutativeFactorization):
         """Validate everything about the factoring is correct"""
@@ -788,7 +819,7 @@ class TestFactorLeftDetail(HurwitzIntTests):
 
         self.assert_equal(n, ans)
 
-        # Validate metacommutation by verifying the norms are sorted
+        # Validate the primes are sorted by norm
         norms = [abs(p) for p in factors.primes]
         assert norms == sorted(norms)
 
@@ -835,23 +866,10 @@ class TestFactorLeft(HurwitzIntTests):
         """Validate factor_left does not apply scalar content more than once."""
         n = hurwitzint(6, 2, 4, 0)
 
-        factors = n.factor_left(canonical=False)
+        factors = n.factor_left()
 
-        assert n.factor_left_detail(canonical=False).content > 1
-        assert len(n.factor_left_detail(canonical=False).primes) > 1
-
-        ans = prod_left(factors)
-
-        self.assert_equal(n, ans)
-
-    def test_canonical_with_content_and_multiple_factors(self):
-        """Validate canonical factor_left works when scalar content is present."""
-        n = hurwitzint(6, 2, 4, 0)
-
-        factors = n.factor_left(canonical=True)
-
-        assert n.factor_left_detail(canonical=True).content > 1
-        assert len(n.factor_left_detail(canonical=True).primes) > 1
+        assert n.factor_left_detail().content > 1
+        assert len(n.factor_left_detail().primes) > 1
 
         ans = prod_left(factors)
 
