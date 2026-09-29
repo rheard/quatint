@@ -7,3 +7,6 @@ dist/
 *.log
 *.pyd
 *.pyproj
+*-stubs/
+__pycache__/
+uv.lock
