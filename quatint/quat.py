@@ -776,10 +776,18 @@ class hurwitzint:
         Bb = Bc = Bd = 0
         best_u = hurwitzint.UNITS[0]
         for u in hurwitzint.UNITS:
+            E, F, G, H = u._a, u._b, u._c, u._d
+
+            # The real part is the same for u*p as for p*u, and on its own it rules out most candidates,
+            #   so the rest of the product is only worked out for a real part at least as large as the best one's
+            real = (A * E - B * F - C * G - D * H) // 2
+            if real < Ba:
+                continue
+
             if right:
-                Pa, Pb, Pc, Pd = _mul_numerators(A, B, C, D, u._a, u._b, u._c, u._d)
+                Pa, Pb, Pc, Pd = _mul_numerators(A, B, C, D, E, F, G, H)
             else:
-                Pa, Pb, Pc, Pd = _mul_numerators(u._a, u._b, u._c, u._d, A, B, C, D)
+                Pa, Pb, Pc, Pd = _mul_numerators(E, F, G, H, A, B, C, D)
 
             # Compare the numerator tuples (Pa, Pb, Pc, Pd) > (Ba, Bb, Bc, Bd) one part at a time,
             #   since mypyc compiles a tuple comparison into a slow generic one
