@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import gcd, prod
-from typing import Callable, ClassVar, Iterable, Iterator, Literal, Union
+from typing import ClassVar, Iterable, Iterator, Literal, Union
 
 from sympy import factorint
 
@@ -98,6 +98,68 @@ def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: i
             (A * F + B * E + C * H - D * G) // 2,
             (A * G - B * H + C * E + D * F) // 2,
             (A * H + B * G - C * F + D * E) // 2)
+
+
+def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int, n: int, *, right: bool) \
+        -> tuple[int, int, int, int, int, int, int, int]:
+    """
+    Nearest-lattice division of x = (A+Bi+Cj+Dk)/2 by y = (E+Fi+Gj+Hk)/2 (with n = N(y) > 0), all as numerators.
+
+    Chooses q in the Hurwitz parity lattice (all components same parity) minimizing
+        sum_i (Qi*n - Ui)^2
+    where U holds the numerators of x * conj(y). Since x / y = x * conj(y) / N(y), each U_i / n is a numerator
+    of the exact quotient. (For right-division U holds conj(y) * x instead, for y^-1 * x.)
+
+    This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
+
+    This is the hot path under division, every gcd and every factorization step, so it works on plain ints: under
+        mypyc a hurwitzint for each intermediate value costs more than the arithmetic does. For the same reason it
+        avoids closures, lambdas and star-args, which mypyc compiles to slow generic Python calls.
+
+    Returns:
+        tuple: The numerators of the quotient q, then those of the remainder, x - q*y (or x - y*q if right).
+    """
+    # Conjugating the divisor just flips the signs of its i, j and k parts
+    if right:
+        Ua, Ub, Uc, Ud = _mul_numerators(E, -F, -G, -H, A, B, C, D)
+    else:
+        Ua, Ub, Uc, Ud = _mul_numerators(A, B, C, D, E, -F, -G, -H)
+
+    # Unconstrained nearest integers to U_i / n (ties away from zero).
+    A0 = _round_div_ties_away_from_zero(Ua, n)
+    B0 = _round_div_ties_away_from_zero(Ub, n)
+    C0 = _round_div_ties_away_from_zero(Uc, n)
+    D0 = _round_div_ties_away_from_zero(Ud, n)
+
+    if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
+        # Fast path: already in the Hurwitz parity lattice.
+        Qa, Qb, Qc, Qd = A0, B0, C0, D0
+    else:
+        # Compare best all-even vs best all-odd. The metric is a sum over the components,
+        #   so each candidate is just the nearest integer of its parity, one component at a time.
+        Ae, mAe = _nearest_with_parity(Ua, A0, 0, n)
+        Be, mBe = _nearest_with_parity(Ub, B0, 0, n)
+        Ce, mCe = _nearest_with_parity(Uc, C0, 0, n)
+        De, mDe = _nearest_with_parity(Ud, D0, 0, n)
+
+        Ao, mAo = _nearest_with_parity(Ua, A0, 1, n)
+        Bo, mBo = _nearest_with_parity(Ub, B0, 1, n)
+        Co, mCo = _nearest_with_parity(Uc, C0, 1, n)
+        Do, mDo = _nearest_with_parity(Ud, D0, 1, n)
+
+        # Deterministic tie-break if equal metric: prefer even.
+        if mAe + mBe + mCe + mDe <= mAo + mBo + mCo + mDo:
+            Qa, Qb, Qc, Qd = Ae, Be, Ce, De
+        else:
+            Qa, Qb, Qc, Qd = Ao, Bo, Co, Do
+
+    # The remainder is x - q*y (or x - y*q)
+    if right:
+        Pa, Pb, Pc, Pd = _mul_numerators(E, F, G, H, Qa, Qb, Qc, Qd)
+    else:
+        Pa, Pb, Pc, Pd = _mul_numerators(Qa, Qb, Qc, Qd, E, F, G, H)
+
+    return Qa, Qb, Qc, Qd, A - Pa, B - Pb, C - Pc, D - Pd
 
 
 class hurwitzint:
@@ -317,19 +379,7 @@ class hurwitzint:
                   *,
                   right: bool = False) -> tuple[hurwitzint, hurwitzint]:
         """
-        A shared division algorithm.
-
-        Chooses q in the Hurwitz parity lattice (all components same parity) minimizing
-            sum_i (Qi*n - Ui)^2
-        where n = divisor_norm and U holds the numerators of self * conj(divisor). Since
-        self / divisor = self * conj(divisor) / N(divisor), each U_i / n is a numerator of the exact quotient.
-        (For right-division U holds conj(divisor) * self instead, for divisor^-1 * self.)
-
-        This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
-
-        Under mypyc this is a hot path (every gcd and factorization step runs through it), so it avoids closures,
-            lambdas and star-args, which compile to slow generic Python calls. It also does its products on plain
-            ints (see _mul_numerators), so the only hurwitzints it builds are the quotient and remainder.
+        The division shared by __divmod__ and rdivmod: the nearest-lattice division of _divmod_numerators.
 
         Args:
             divisor: The divisor.
@@ -339,51 +389,10 @@ class hurwitzint:
         Returns:
             tuple: The quotient and remainder.
         """
-        n = divisor_norm
-        A, B, C, D = self._a, self._b, self._c, self._d
-        E, F, G, H = divisor._a, divisor._b, divisor._c, divisor._d
-
-        # Conjugating the divisor just flips the signs of its i, j and k parts
-        if right:
-            Ua, Ub, Uc, Ud = _mul_numerators(E, -F, -G, -H, A, B, C, D)
-        else:
-            Ua, Ub, Uc, Ud = _mul_numerators(A, B, C, D, E, -F, -G, -H)
-
-        # Unconstrained nearest integers to U_i / n (ties away from zero).
-        A0 = _round_div_ties_away_from_zero(Ua, n)
-        B0 = _round_div_ties_away_from_zero(Ub, n)
-        C0 = _round_div_ties_away_from_zero(Uc, n)
-        D0 = _round_div_ties_away_from_zero(Ud, n)
-
-        if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
-            # Fast path: already in the Hurwitz parity lattice.
-            Qa, Qb, Qc, Qd = A0, B0, C0, D0
-        else:
-            # Compare best all-even vs best all-odd. The metric is a sum over the components,
-            #   so each candidate is just the nearest integer of its parity, one component at a time.
-            Ae, mAe = _nearest_with_parity(Ua, A0, 0, n)
-            Be, mBe = _nearest_with_parity(Ub, B0, 0, n)
-            Ce, mCe = _nearest_with_parity(Uc, C0, 0, n)
-            De, mDe = _nearest_with_parity(Ud, D0, 0, n)
-
-            Ao, mAo = _nearest_with_parity(Ua, A0, 1, n)
-            Bo, mBo = _nearest_with_parity(Ub, B0, 1, n)
-            Co, mCo = _nearest_with_parity(Uc, C0, 1, n)
-            Do, mDo = _nearest_with_parity(Ud, D0, 1, n)
-
-            # Deterministic tie-break if equal metric: prefer even.
-            if mAe + mBe + mCe + mDe <= mAo + mBo + mCo + mDo:
-                Qa, Qb, Qc, Qd = Ae, Be, Ce, De
-            else:
-                Qa, Qb, Qc, Qd = Ao, Bo, Co, Do
-
-        # The remainder is self - q*divisor (or self - divisor*q)
-        if right:
-            Pa, Pb, Pc, Pd = _mul_numerators(E, F, G, H, Qa, Qb, Qc, Qd)
-        else:
-            Pa, Pb, Pc, Pd = _mul_numerators(Qa, Qb, Qc, Qd, E, F, G, H)
-
-        return self._make(Qa, Qb, Qc, Qd), self._make(A - Pa, B - Pb, C - Pc, D - Pd)
+        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(self._a, self._b, self._c, self._d,
+                                                            divisor._a, divisor._b, divisor._c, divisor._d,
+                                                            divisor_norm, right=right)
+        return self._make(Qa, Qb, Qc, Qd), self._make(Ra, Rb, Rc, Rd)
 
     # region Left-division helpers (non-commutative!)
     def __divmod__(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
@@ -644,34 +653,37 @@ class hurwitzint:
     def _gcd(self,
              other: OP_TYPES,
              *,
-             divmod_method: Callable = divmod) -> hurwitzint:
-        """GCD via Euclidean algorithm, as whichever associate the algorithm lands on."""
+             right: bool = False) -> hurwitzint:
+        """
+        GCD via Euclidean algorithm, as whichever associate the algorithm lands on.
+
+        This divides on the left (a = q*b + r) for a right gcd, or with right=True on the right (a = b*q + r)
+            for a left gcd. The loop runs on plain int numerators (see _divmod_numerators), so the only
+            hurwitzint it builds is the answer.
+
+        Returns:
+            hurwitzint: The gcd.
+
+        Raises:
+            TypeError: If other is an unsupported type.
+        """
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
             raise TypeError(f"Unable to divide hurwitzint and type {type(other)}")
 
-        a = self
-        b = other
+        if not self:
+            return other
 
-        if not a:
-            return b
+        A, B, C, D = self._a, self._b, self._c, self._d
+        E, F, G, H = other._a, other._b, other._c, other._d
+        while E or F or G or H:
+            n = (E * E + F * F + G * G + H * H) >> 2
+            _, _, _, _, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right)
+            A, B, C, D, E, F, G, H = E, F, G, H, Ra, Rb, Rc, Rd
 
-        if b:
-            # last = abs(b)
-            while b:
-                _, r = divmod_method(a, b)
-                a, b = b, r
-
-                # This is supposedly only a sanity check:
-                # if b:
-                #     nb = abs(b)
-                #     if nb >= last:
-                #         raise ArithmeticError("Euclidean descent failed (non-decreasing remainder norm)")
-                #     last = nb
-
-        return a
+        return self._make(A, B, C, D)
 
     def gcd_right(self,
                   other: OP_TYPES,
@@ -714,7 +726,7 @@ class hurwitzint:
         Returns:
             hurwitzint: The gcd.
         """
-        g = self._gcd(other, divmod_method=rdivmod)
+        g = self._gcd(other, right=True)
         return g._canonical_associate(direction="right")[0] if normalize else g
     # endregion
 
