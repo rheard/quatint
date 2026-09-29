@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import operator
 import os
+import pickle
 
 from itertools import product
 from math import gcd, isqrt
@@ -115,6 +117,32 @@ class TestEqualityWithNumbers(HurwitzIntTests):
 
         equal_values = [hurwitzint(2), 2, 2.0, complex(2, 0)]
         assert len(set(equal_values)) == 1
+
+
+class TestImmutable(HurwitzIntTests):
+    """Tests that a hurwitzint cannot be changed once it is made"""
+
+    def test_components_are_read_only(self):
+        """Setting or deleting a, b, c or d raises AttributeError, and leaves the value (and its hash) alone"""
+        x = hurwitzint(1, 2, 3, 4)
+        values = {x: "x"}
+
+        for name in ("a", "b", "c", "d"):
+            with pytest.raises(AttributeError):
+                setattr(x, name, 3)
+
+            with pytest.raises(AttributeError):
+                delattr(x, name)
+
+        assert list(x) == [2, 4, 6, 8]
+        assert values[hurwitzint(1, 2, 3, 4)] == "x"
+
+    def test_copy_and_pickle(self):
+        """Copies and pickled round trips are still equal to the original"""
+        for x in (hurwitzint(1, 2, 3, 4), hurwitzint(3, -5, 7, 9, half=True)):
+            assert copy.copy(x) == x
+            assert copy.deepcopy(x) == x
+            assert pickle.loads(pickle.dumps(x)) == x
 
 
 class TestAdd(HurwitzIntTests):

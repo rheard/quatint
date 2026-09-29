@@ -73,14 +73,16 @@ class hurwitzint:
       - Multiplication is non-commutative.
       - The reduced norm is always an integer for valid Hurwitz elements:
             N(q) = (A^2 + B^2 + C^2 + D^2) / 4
+      - Values are immutable, like int or Fraction: a, b, c and d are read-only views of the numerators,
+            so a hurwitzint is safe to hash, and to use in sets and as a dict key.
     """
 
-    __slots__ = ("a", "b", "c", "d")
+    __slots__ = ("_a", "_b", "_c", "_d")
 
-    a: int
-    b: int
-    c: int
-    d: int
+    _a: int
+    _b: int
+    _c: int
+    _d: int
 
     UNITS: ClassVar[list[hurwitzint]] = []
 
@@ -124,7 +126,27 @@ class hurwitzint:
         if ((a0 ^ b0) & 1) or ((a0 ^ c0) & 1) or ((a0 ^ d0) & 1):
             raise ValueError("For Hurwitz integers, a,b,c,d must all have the same parity")
 
-        self.a, self.b, self.c, self.d = a0, b0, c0, d0
+        self._a, self._b, self._c, self._d = a0, b0, c0, d0
+
+    @property
+    def a(self) -> int:
+        """Numerator of the real part (which is a / 2)"""
+        return self._a
+
+    @property
+    def b(self) -> int:
+        """Numerator of the i part (which is b / 2)"""
+        return self._b
+
+    @property
+    def c(self) -> int:
+        """Numerator of the j part (which is c / 2)"""
+        return self._c
+
+    @property
+    def d(self) -> int:
+        """Numerator of the k part (which is d / 2)"""
+        return self._d
 
     # region constructors / conversions
     @classmethod
@@ -148,7 +170,7 @@ class hurwitzint:
     @property
     def is_lipschitz(self) -> bool:
         """True iff all components are integers (i.e., all numerators even)."""
-        return ((self.a | self.b | self.c | self.d) & 1) == 0
+        return ((self._a | self._b | self._c | self._d) & 1) == 0
 
     @property
     def den(self) -> int:
@@ -157,14 +179,14 @@ class hurwitzint:
 
     def conjugate(self) -> hurwitzint:
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
-        return self._make(self.a, -self.b, -self.c, -self.d)
+        return self._make(self._a, -self._b, -self._c, -self._d)
 
     def __add__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
         if isinstance(other, hurwitzint):
-            return self._make(self.a + other.a, self.b + other.b, self.c + other.c, self.d + other.d)
+            return self._make(self._a + other._a, self._b + other._b, self._c + other._c, self._d + other._d)
 
         return NotImplemented
 
@@ -176,7 +198,7 @@ class hurwitzint:
             other = self._from_obj(other)
 
         if isinstance(other, hurwitzint):
-            return self._make(self.a - other.a, self.b - other.b, self.c - other.c, self.d - other.d)
+            return self._make(self._a - other._a, self._b - other._b, self._c - other._c, self._d - other._d)
 
         return NotImplemented
 
@@ -184,10 +206,10 @@ class hurwitzint:
         return self.__neg__().__add__(other)
 
     def __neg__(self) -> hurwitzint:
-        return self._make(-self.a, -self.b, -self.c, -self.d)
+        return self._make(-self._a, -self._b, -self._c, -self._d)
 
     def __pos__(self) -> hurwitzint:
-        return self._make(self.a, self.b, self.c, self.d)
+        return self._make(self._a, self._b, self._c, self._d)
 
     def __mul__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, _OTHER_OP_TYPES):
@@ -200,8 +222,8 @@ class hurwitzint:
         # If q=(A+Bi+Cj+Dk)/2 and r=(E+Fi+Gj+Hk)/2,
         # then qr has denominator 4; we store with denominator 2,
         # so we must divide resulting numerators by 2.
-        A, B, C, D = self.a, self.b, self.c, self.d
-        E, F, G, H = other.a, other.b, other.c, other.d
+        A, B, C, D = self._a, self._b, self._c, self._d
+        E, F, G, H = other._a, other._b, other._c, other._d
 
         # (a,b,c,d)*(e,f,g,h) with i^2=j^2=k^2=ijk=-1:
         P = A * E - B * F - C * G - D * H
@@ -264,10 +286,10 @@ class hurwitzint:
         n = divisor_norm
 
         # Unconstrained nearest integers to U_i / n (ties away from zero).
-        A0 = _round_div_ties_away_from_zero(num.a, n)
-        B0 = _round_div_ties_away_from_zero(num.b, n)
-        C0 = _round_div_ties_away_from_zero(num.c, n)
-        D0 = _round_div_ties_away_from_zero(num.d, n)
+        A0 = _round_div_ties_away_from_zero(num._a, n)
+        B0 = _round_div_ties_away_from_zero(num._b, n)
+        C0 = _round_div_ties_away_from_zero(num._c, n)
+        D0 = _round_div_ties_away_from_zero(num._d, n)
 
         # Fast path: already in the Hurwitz parity lattice.
         if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
@@ -301,10 +323,10 @@ class hurwitzint:
             return Qp, mp
 
         def build_candidate(parity: int) -> tuple[int, int, int, int, int]:
-            A, mA = best_with_parity(num.a, A0, parity)
-            B, mB = best_with_parity(num.b, B0, parity)
-            C, mC = best_with_parity(num.c, C0, parity)
-            D, mD = best_with_parity(num.d, D0, parity)
+            A, mA = best_with_parity(num._a, A0, parity)
+            B, mB = best_with_parity(num._b, B0, parity)
+            C, mC = best_with_parity(num._c, C0, parity)
+            D, mD = best_with_parity(num._d, D0, parity)
             return A, B, C, D, (mA + mB + mC + mD)
 
         # Compare best all-even vs best all-odd.
@@ -456,7 +478,7 @@ class hurwitzint:
         Raises:
             ArithmeticError: If there is a non-integral norm due to parity violation.
         """
-        num = self.a * self.a + self.b * self.b + self.c * self.c + self.d * self.d
+        num = self._a * self._a + self._b * self._b + self._c * self._c + self._d * self._d
         # q, r = divmod(num, 4)   # Below is ever so slightly faster it seems, and this is an important operation
         r = num & 3
         q = num >> 2
@@ -467,58 +489,58 @@ class hurwitzint:
         return q
 
     def __bool__(self) -> bool:
-        return (self.a | self.b | self.c | self.d) != 0
+        return (self._a | self._b | self._c | self._d) != 0
 
     def __iter__(self) -> Iterator[int]:
-        return iter((self.a, self.b, self.c, self.d))
+        return iter((self._a, self._b, self._c, self._d))
 
     def __len__(self) -> int:
         return 4
 
     def __getitem__(self, idx: int) -> int:
         if idx == 0:
-            return self.a
+            return self._a
         if idx == 1:
-            return self.b
+            return self._b
         if idx == 2:
-            return self.c
+            return self._c
         if idx == 3:
-            return self.d
+            return self._d
         raise IndexError("hurwitzint index out of range (valid: 0..3)")
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, hurwitzint):
-            return (self.a, self.b, self.c, self.d) == (other.a, other.b, other.c, other.d)
+            return (self._a, self._b, self._c, self._d) == (other._a, other._b, other._c, other._d)
 
         # Python numbers compare exactly (unlike arithmetic, which truncates floats with int()), since anything equal
         #   has to hash the same too (see __hash__). A complex off the real axis is never equal.
         if isinstance(other, int):
-            return self.b == 0 and self.c == 0 and self.d == 0 and self.a == 2 * other
+            return self._b == 0 and self._c == 0 and self._d == 0 and self._a == 2 * other
 
         if isinstance(other, (float, complex)):
             real, imag = other.real, other.imag
             if imag or not real.is_integer():
                 return False
 
-            return self.b == 0 and self.c == 0 and self.d == 0 and self.a == 2 * int(real)
+            return self._b == 0 and self._c == 0 and self._d == 0 and self._a == 2 * int(real)
 
         return False
 
     def __hash__(self) -> int:
         # Equal objects must hash the same, so a real value hashes like the int it equals (see __eq__)
-        if self.b == 0 and self.c == 0 and self.d == 0:
-            return hash(self.a // 2)
+        if self._b == 0 and self._c == 0 and self._d == 0:
+            return hash(self._a // 2)
 
-        return hash((self.a, self.b, self.c, self.d))
+        return hash((self._a, self._b, self._c, self._d))
 
     def __repr__(self) -> str:
         if self.is_lipschitz:
             # If all even, show integer components without "/2".
-            ra, rb, rc, rd = self.a // 2, self.b // 2, self.c // 2, self.d // 2
+            ra, rb, rc, rd = self._a // 2, self._b // 2, self._c // 2, self._d // 2
             den = None
         else:
             # Otherwise show numerator form "(...)/2".
-            ra, rb, rc, rd = self.a, self.b, self.c, self.d
+            ra, rb, rc, rd = self._a, self._b, self._c, self._d
             den = 2
 
         # Special-case: only time we omit parentheses is when den is None and
@@ -567,10 +589,10 @@ class hurwitzint:
             return 1 if n > 0 else -1
 
         half_unit = self._make(
-            sgn(self.a),
-            sgn(self.b),
-            sgn(self.c),
-            sgn(self.d),
+            sgn(self._a),
+            sgn(self._b),
+            sgn(self._c),
+            sgn(self._d),
         )
         whole = self - half_unit
 
@@ -663,7 +685,7 @@ class hurwitzint:
         Returns:
             int: Computed content value.
         """
-        A, B, C, D = self.a, self.b, self.c, self.d
+        A, B, C, D = self._a, self._b, self._c, self._d
         g = gcd(abs(A), abs(B), abs(C), abs(D))
 
         if g == 0:
