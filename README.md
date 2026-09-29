@@ -106,6 +106,16 @@ gl = a.gcd_left(b)    # common left divisor (a = gl*x, b = gl*y)
 gr = a.gcd_right(b)   # common right divisor (a = x*gr, b = y*gr)
 ```
 
+A gcd is only unique up to a unit on one side, so both return a canonical choice: the associate with the largest real part
+    (then the largest i, j and k parts, to break ties). The result doesn't depend on the argument order,
+    and the gcd of two integers is their usual positive gcd:
+
+```python
+from quatint import hurwitzint
+
+assert hurwitzint(-6).gcd_right(15) == 3
+```
+
 ### Factorization
 
 `quatint` exposes two levels of factorization API:

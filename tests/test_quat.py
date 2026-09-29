@@ -4,7 +4,7 @@ import operator
 import os
 
 from itertools import product
-from math import isqrt
+from math import gcd, isqrt
 from pathlib import Path
 
 import pytest
@@ -650,6 +650,9 @@ class TestGcdRight(HurwitzIntTests):
 class TestGcd(HurwitzIntTests):
     """Tests for gcd_left and gcd_right"""
 
+    gcd_cofactors = (hurwitzint(1, 2, 3, 4), hurwitzint(5, 1, 2, 7), hurwitzint(2, 3, 4, 53),
+                     hurwitzint(1, 1, 1, 1, half=True))
+
     def test_gcd_agrees_with_integer_gcd_on_scalars(self):
         """For purely real scalars, gcd_left/gcd_right should match the integer gcd (up to sign/unit)."""
         a = hurwitzint(6, 0, 0, 0)
@@ -668,6 +671,63 @@ class TestGcd(HurwitzIntTests):
 
         assert dr.a == 6
         assert dl.a == 6
+
+    def test_gcd_of_integers_is_positive(self):
+        """The gcd of two integers is their positive integer gcd, whatever their signs"""
+        for a, b in ((6, 15), (-6, 15), (6, -15), (-6, -15), (12, 18), (0, -7), (-7, 0), (0, 0)):
+            assert hurwitzint(a).gcd_right(b) == gcd(a, b)
+            assert hurwitzint(a).gcd_left(b) == gcd(a, b)
+
+    def test_coprime_gcd_is_one(self):
+        """Hurwitz integers with coprime norms share no factor, and their gcd comes out as exactly 1"""
+        a = hurwitzint(1, 2, 3, 4)  # norm 30
+        b = hurwitzint(1, 1, 1, 2)  # norm 7
+
+        assert a.gcd_right(b) == 1
+        assert b.gcd_right(a) == 1
+        assert a.gcd_left(b) == 1
+        assert b.gcd_left(a) == 1
+
+    def test_gcd_does_not_depend_on_argument_order(self):
+        """Both orders give the same canonical common factor (this pair once gave 1+j one way and i-j the other)"""
+        g = hurwitzint(1, 1, 0, 0)
+        b = hurwitzint(1, 2, 3, 4) * g
+        c = hurwitzint(5, 1, 2, 7) * g
+
+        assert b.gcd_right(c) == g
+        assert c.gcd_right(b) == g
+
+    def test_gcd_right_is_canonical(self):
+        """gcd_right does not depend on the argument order, or on units on the left of either argument"""
+        g = hurwitzint(3, 5, 7, 9, half=True)
+        for x in self.gcd_cofactors:
+            for y in self.gcd_cofactors:
+                a, b = x * g, y * g
+                d = a.gcd_right(b)
+
+                # g is a common right divisor, so it right-divides the greatest one
+                assert not divmod(d, g)[1]
+
+                assert b.gcd_right(a) == d
+                for u in hurwitzint.UNITS:
+                    assert (u * a).gcd_right(b) == d
+                    assert a.gcd_right(u * b) == d
+
+    def test_gcd_left_is_canonical(self):
+        """gcd_left does not depend on the argument order, or on units on the right of either argument"""
+        g = hurwitzint(3, 5, 7, 9, half=True)
+        for x in self.gcd_cofactors:
+            for y in self.gcd_cofactors:
+                a, b = g * x, g * y
+                d = a.gcd_left(b)
+
+                # g is a common left divisor, so it left-divides the greatest one
+                assert not d.rdivmod(g)[1]
+
+                assert b.gcd_left(a) == d
+                for u in hurwitzint.UNITS:
+                    assert (a * u).gcd_left(b) == d
+                    assert a.gcd_left(b * u) == d
 
 
 class TestFactorRightDetail(HurwitzIntTests):

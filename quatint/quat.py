@@ -577,34 +577,11 @@ class hurwitzint:
         return whole, half_unit
 
     # region GCD
-    def _normalize_unit(self) -> hurwitzint:
-        """
-        Deterministic associate choice up to ±1.
-
-        Full normalization up to the 24 Hurwitz units is possible, but this keeps things
-        cheap and stable: multiply by -1 so the first nonzero numerator component is > 0.
-
-        Returns:
-            hurwitzint: The unit normalized hurwitzint.
-        """
-        if not self:
-            return self
-
-        a, b, c, d = self
-        if a != 0:
-            return -self if a < 0 else self
-        if b != 0:
-            return -self if b < 0 else self
-        if c != 0:
-            return -self if c < 0 else self
-        return -self if d < 0 else self
-
     def _gcd(self,
              other: OP_TYPES,
              *,
-             divmod_method: Callable = divmod,
-             normalize: bool = True) -> hurwitzint:
-        """GCD via Euclidean algorithm."""
+             divmod_method: Callable = divmod) -> hurwitzint:
+        """GCD via Euclidean algorithm, as whichever associate the algorithm lands on."""
         if isinstance(other, _OTHER_OP_TYPES):
             other = self._from_obj(other)
 
@@ -615,7 +592,7 @@ class hurwitzint:
         b = other
 
         if not a:
-            return b._normalize_unit() if normalize else b
+            return b
 
         if b:
             # last = abs(b)
@@ -630,7 +607,7 @@ class hurwitzint:
                 #         raise ArithmeticError("Euclidean descent failed (non-decreasing remainder norm)")
                 #     last = nb
 
-        return a._normalize_unit() if normalize else a
+        return a
 
     def gcd_right(self,
                   other: OP_TYPES,
@@ -641,12 +618,18 @@ class hurwitzint:
 
         The result g is a "right gcd":
             a = q*b + r
-            a = a' * g and b = b' * g   (up to multiplication by a unit)
+            a = a' * g and b = b' * g
+
+        A right gcd is only unique up to a unit on its left (u*g), so by default this returns the canonical one
+            of those (see `_canonical_associate`). That makes it independent of the argument order, and of any
+            units on the left of either argument. normalize=False skips that, returning whichever associate
+            the Euclidean algorithm lands on.
 
         Returns:
             hurwitzint: The gcd.
         """
-        return self._gcd(other, normalize=normalize)
+        g = self._gcd(other)
+        return g._canonical_associate(direction="left")[0] if normalize else g
 
     def gcd_left(self,
                  other: OP_TYPES,
@@ -657,12 +640,18 @@ class hurwitzint:
 
         The result g is a "left gcd":
             a = b*q + r
-            a = g * a' and b = g * b'   (up to multiplication by a unit)
+            a = g * a' and b = g * b'
+
+        A left gcd is only unique up to a unit on its right (g*u), so by default this returns the canonical one
+            of those (see `_canonical_associate`). That makes it independent of the argument order, and of any
+            units on the right of either argument. normalize=False skips that, returning whichever associate
+            the Euclidean algorithm lands on.
 
         Returns:
             hurwitzint: The gcd.
         """
-        return self._gcd(other, divmod_method=rdivmod, normalize=normalize)
+        g = self._gcd(other, divmod_method=rdivmod)
+        return g._canonical_associate(direction="right")[0] if normalize else g
     # endregion
 
     # region Factoring
@@ -691,18 +680,21 @@ class hurwitzint:
 
     def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple[hurwitzint, hurwitzint]:
         """
-        Unit-migration normalization for a *left* factor:
-            replace p by p*u (u a unit).
+        Pick the canonical one of the 24 associates that differ from self by a unit on one side.
+
+        direction="right" considers p*u, and direction="left" considers u*p (u a unit).
+            The canonical one has the largest numerator tuple: the largest real part, with ties going to the
+            largest i, then j, then k part. So for example a nonzero integer always comes out positive.
 
         Returns:
-             tuple: (p_canon, u) such that p_canon = p*u.
+             tuple: (p_canon, u) such that p_canon = p*u (direction="right") or p_canon = u*p (direction="left").
         """
         best = None
         best_u = None
         for u in hurwitzint.UNITS:
             cand = self * u if direction == "right" else u * self
             key = tuple(cand)
-            if best is None or key < best:
+            if best is None or key > best:
                 best = key
                 best_u = u
 
@@ -717,20 +709,37 @@ class hurwitzint:
             g = gcd_right(self, p)
 
         Returns:
-            hurwitzint: A Hurwitz prime with norm p that divides self.
+            hurwitzint: The canonical Hurwitz prime with norm p that divides self on the right.
 
         Raises:
             ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
         # Directly extract from q via gcd with the scalar p
-        scalar = hurwitzint(p, 0, 0, 0)
-        g = self.gcd_right(scalar, normalize=False)
+        g = self.gcd_right(p)
 
         if abs(g) != p:
             raise ArithmeticError(f"Failed to extract right prime for {p=}")
 
-        g_canon, _ = g._canonical_associate(direction="left")
-        return g_canon
+        return g
+
+    def _extract_left_prime(self, p: int) -> hurwitzint:
+        """
+        Extract a left prime of norm p dividing self.
+            g = gcd_left(self, p)
+
+        Returns:
+            hurwitzint: The canonical Hurwitz prime with norm p that divides self on the left.
+
+        Raises:
+            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
+        """
+        # Directly extract from q via gcd with the scalar p
+        g = self.gcd_left(p)
+
+        if abs(g) != p:
+            raise ArithmeticError(f"Failed to extract left prime for {p=}")
+
+        return g
 
     def factor_right_detail(self) -> NonCommutativeFactorization:
         """
@@ -845,13 +854,7 @@ class hurwitzint:
         for p in sorted(nf.keys(), reverse=True):
             e = nf[p]
             for _ in range(e):
-                # Extract a LEFT prime factor of norm p:
-                # do the symmetric trick by factoring the conjugate on the right,
-                # then conjugating back.
-                pi_r = q.conjugate()._extract_right_prime(p).conjugate()
-
-                # Normalize for left-factorization by right-multiplying a unit: pi = pi_r * u
-                pi, _ = pi_r._canonical_associate(direction="right")
+                pi = q._extract_left_prime(p)
 
                 # Divide on the left: q = pi * qq
                 qq, rr = q.rdivmod(pi)
