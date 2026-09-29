@@ -55,13 +55,10 @@ before-test = [
     'mkdir "{project}/temp"',
     'mv "{project}/quatint" "{project}/temp/quatint"',  # Move the .py files away so they are not used in testing
 ]
-test-requires=["ruff", "pylint", "pytest-xdist", "hurwitz"]
+test-requires=["pytest", "pytest-xdist", "hurwitz"]
 test-command=[
+    # Ruff and the test docstring check run once, in the checks job of the CI workflow
     "python -m pytest -n auto {project}/tests",
-    "ruff check {project}",
-
-    # Require docstrings on all unit tests!
-    'python -m pylint {project}/tests --disable=all --enable=C0115,C0116 --no-docstring-rgx="^(?!(test_|Test)).*"',
     'mv "{project}/temp/quatint" "{project}/quatint"',  # Move the .py files back so they are ready for the next build
     'rm -rf "{project}/temp"',
 ]
