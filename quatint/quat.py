@@ -84,6 +84,22 @@ def _nearest_with_parity(U: int, Q0: int, parity: int, n: int) -> tuple[int, int
     return Qp, mp
 
 
+def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int) -> tuple[int, int, int, int]:
+    """
+    Multiply two Hurwitz integers given as numerators, (A+Bi+Cj+Dk)/2 * (E+Fi+Gj+Hk)/2, like hurwitzint.__mul__.
+
+    Working on plain ints means no hurwitzint gets built (or parity-checked) for an intermediate product.
+        The product of two Hurwitz integers is one too, so each numerator over 4 is even and halves exactly.
+
+    Returns:
+        tuple: The product's numerators, over 2.
+    """
+    return ((A * E - B * F - C * G - D * H) // 2,
+            (A * F + B * E + C * H - D * G) // 2,
+            (A * G - B * H + C * E + D * F) // 2,
+            (A * H + B * G - C * F + D * E) // 2)
+
+
 class hurwitzint:
     """
     Hurwitz quaternion integer.
@@ -292,7 +308,6 @@ class hurwitzint:
 
     # region Euclidean division (Hurwitz order is norm-Euclidean)
     def _division(self,
-                  num: hurwitzint,
                   divisor: hurwitzint,
                   divisor_norm: int,
                   *,
@@ -302,15 +317,17 @@ class hurwitzint:
 
         Chooses q in the Hurwitz parity lattice (all components same parity) minimizing
             sum_i (Qi*n - Ui)^2
-        where U = (num.a,num.b,num.c,num.d) and n = divisor_norm.
+        where n = divisor_norm and U holds the numerators of self * conj(divisor). Since
+        self / divisor = self * conj(divisor) / N(divisor), each U_i / n is a numerator of the exact quotient.
+        (For right-division U holds conj(divisor) * self instead, for divisor^-1 * self.)
 
         This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
 
         Under mypyc this is a hot path (every gcd and factorization step runs through it), so it avoids closures,
-            lambdas and star-args, which compile to slow generic Python calls.
+            lambdas and star-args, which compile to slow generic Python calls. It also does its products on plain
+            ints (see _mul_numerators), so the only hurwitzints it builds are the quotient and remainder.
 
         Args:
-            num: The number to divide.
             divisor: The divisor.
             divisor_norm: The divisor norm. Should be checked for 0 already!
             right: Divide on the right (self = divisor*q + r), rather than on the left (self = q*divisor + r).
@@ -319,7 +336,14 @@ class hurwitzint:
             tuple: The quotient and remainder.
         """
         n = divisor_norm
-        Ua, Ub, Uc, Ud = num._a, num._b, num._c, num._d
+        A, B, C, D = self._a, self._b, self._c, self._d
+        E, F, G, H = divisor._a, divisor._b, divisor._c, divisor._d
+
+        # Conjugating the divisor just flips the signs of its i, j and k parts
+        if right:
+            Ua, Ub, Uc, Ud = _mul_numerators(E, -F, -G, -H, A, B, C, D)
+        else:
+            Ua, Ub, Uc, Ud = _mul_numerators(A, B, C, D, E, -F, -G, -H)
 
         # Unconstrained nearest integers to U_i / n (ties away from zero).
         A0 = _round_div_ties_away_from_zero(Ua, n)
@@ -329,7 +353,7 @@ class hurwitzint:
 
         if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
             # Fast path: already in the Hurwitz parity lattice.
-            q = self._make(A0, B0, C0, D0)
+            Qa, Qb, Qc, Qd = A0, B0, C0, D0
         else:
             # Compare best all-even vs best all-odd. The metric is a sum over the components,
             #   so each candidate is just the nearest integer of its parity, one component at a time.
@@ -345,12 +369,17 @@ class hurwitzint:
 
             # Deterministic tie-break if equal metric: prefer even.
             if mAe + mBe + mCe + mDe <= mAo + mBo + mCo + mDo:
-                q = self._make(Ae, Be, Ce, De)
+                Qa, Qb, Qc, Qd = Ae, Be, Ce, De
             else:
-                q = self._make(Ao, Bo, Co, Do)
+                Qa, Qb, Qc, Qd = Ao, Bo, Co, Do
 
-        r = self - divisor * q if right else self - q * divisor
-        return q, r
+        # The remainder is self - q*divisor (or self - divisor*q)
+        if right:
+            Pa, Pb, Pc, Pd = _mul_numerators(E, F, G, H, Qa, Qb, Qc, Qd)
+        else:
+            Pa, Pb, Pc, Pd = _mul_numerators(Qa, Qb, Qc, Qd, E, F, G, H)
+
+        return self._make(Qa, Qb, Qc, Qd), self._make(A - Pa, B - Pb, C - Pc, D - Pd)
 
     # region Left-division helpers (non-commutative!)
     def __divmod__(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
@@ -379,11 +408,8 @@ class hurwitzint:
         if n == 0:
             raise ZeroDivisionError
 
-        # num approximates self / other in the usual quaternion sense:
-        # q ~ self * conj(other) / N(other)
-        num = self * other.conjugate()
-
-        return self._division(num, other, n)
+        # q ~ self * conj(other) / N(other), the usual quaternion self / other (see _division)
+        return self._division(other, n)
 
     def __rdivmod__(self, other: OTHER_OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
         if isinstance(other, _OTHER_OP_TYPES):
@@ -458,10 +484,8 @@ class hurwitzint:
         if n == 0:
             raise ZeroDivisionError
 
-        # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other)
-        num = other.conjugate() * self
-
-        return self._division(num, other, n, right=True)
+        # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other) (see _division)
+        return self._division(other, n, right=True)
 
     def rtruediv(self, other: OP_TYPES) -> hurwitzint:
         """A version of __truediv__ for right-division"""
