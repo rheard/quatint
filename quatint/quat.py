@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import gcd, prod
-from typing import Callable, ClassVar, Generator, Iterable, Iterator, Literal, Union
+from typing import Callable, ClassVar, Iterable, Iterator, Literal, Union
 
 from sympy import factorint
 
