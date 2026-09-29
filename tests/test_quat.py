@@ -17,7 +17,7 @@ from hurwitz import HurwitzQuaternion
 
 import quatint.quat
 
-from quatint.quat import NonCommutativeFactorization, hurwitzint, prod_left, prod_right, rdivmod
+from quatint.quat import NonCommutativeFactorization, gcd_left, gcd_right, hurwitzint, prod_left, prod_right, rdivmod
 
 @pytest.mark.skipif(os.getenv("CI", "").lower() not in {"1", "true", "yes"},
                     reason="Compiled-only test")
@@ -1192,6 +1192,83 @@ class TestGcd(HurwitzIntTests):
                 for u in hurwitzint.UNITS:
                     assert (a * u).gcd_left(b) == d
                     assert a.gcd_left(b * u) == d
+
+    def test_gcd_is_greatest(self):
+        """With coprime N(x) and N(y), x*g and y*g share nothing more than g, so their gcd is exactly g"""
+        rng = random.Random(7_000)
+        for bound in (3, 10**3, 10**9):
+            for _ in range(60):
+                g = self.rand_hurwitzint(rng, bound)
+                x = self.rand_hurwitzint(rng, bound)
+                y = self.rand_hurwitzint(rng, bound)
+                while gcd(abs(x), abs(y)) != 1:
+                    y = self.rand_hurwitzint(rng, bound)
+
+                # A gcd with 0 is the canonical associate of the other argument, so these name g's canonical associates
+                assert (x * g).gcd_right(y * g) == g.gcd_right(0)
+                assert (g * x).gcd_left(g * y) == g.gcd_left(0)
+
+    def test_unnormalized_gcd_is_an_associate(self):
+        """normalize=False returns whichever gcd the algorithm lands on, which is a unit times the normalized one"""
+        g = hurwitzint(3, 5, 7, 9, half=True)
+        for x in self.gcd_cofactors:
+            for y in self.gcd_cofactors:
+                raw = (x * g).gcd_right(y * g, normalize=False)
+                assert any(u * raw == (x * g).gcd_right(y * g) for u in hurwitzint.UNITS)
+
+                raw = (g * x).gcd_left(g * y, normalize=False)
+                assert any(raw * u == (g * x).gcd_left(g * y) for u in hurwitzint.UNITS)
+
+    def test_module_level_helpers(self):
+        """The module-level gcd_left and gcd_right give the same results as the methods"""
+        pairs = (
+            (hurwitzint(2, 3, 4, 53), self.a_int),
+            (hurwitzint(3, 5, 7, 9, half=True) * self.a_int, self.a_int),
+            (hurwitzint(12), 18),
+        )
+        for a, b in pairs:
+            assert gcd_left(a, b) == a.gcd_left(b)
+            assert gcd_right(a, b) == a.gcd_right(b)
+
+    def test_unsupported_types_raise_type_error(self):
+        """A gcd with something that is not a number raises TypeError, on either side"""
+        x = self.a_int
+        for method in (x.gcd_right, x.gcd_left):
+            for other in ("a", None, [1]):
+                with pytest.raises(TypeError):
+                    method(other)
+
+
+class TestContent(HurwitzIntTests):
+    """Tests for content, the largest integer that divides a Hurwitz integer"""
+
+    def test_examples(self):
+        """Some values worked out by hand, including multiples of 1+i+j+k, which is 2 times the unit (1+i+j+k)/2"""
+        assert hurwitzint(0).content() == 0
+        assert hurwitzint(6).content() == 6
+        assert hurwitzint(-6).content() == 6
+        assert hurwitzint(1, 2, 3, 4).content() == 1
+        assert hurwitzint(2, 4, 6, 8).content() == 2
+        assert hurwitzint(6, 2, 4, 0).content() == 2
+        assert hurwitzint(1, 1, 1, 1).content() == 2
+        assert hurwitzint(3, 3, 3, 3).content() == 6
+        assert hurwitzint(3, 5, 7, 9, half=True).content() == 1
+        assert hurwitzint(3, 3, 3, 3, half=True).content() == 3
+
+    def test_content_is_largest(self):
+        """Every x is its content times a Hurwitz integer of content 1, and m*x has |m| times the content of x"""
+        rng = random.Random(8_000)
+        for bound in (3, 10**4, 10**30):
+            for _ in range(100):
+                x = self.rand_hurwitzint(rng, bound)
+                m = x.content()
+                primitive = x // m
+
+                assert m * primitive == x
+                assert primitive.content() == 1
+
+                k = rng.choice((2, -3, 12, 10**9))
+                assert (k * x).content() == abs(k) * m
 
 
 class TestFactorRightDetail(HurwitzIntTests):
