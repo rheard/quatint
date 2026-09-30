@@ -7,7 +7,7 @@ from typing import ClassVar, Iterable, Iterator, Literal, Union
 
 from sympy import factorint, isprime
 
-OTHER_OP_TYPES = Union[int, float]
+OTHER_OP_TYPES = int | float
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
 
