@@ -1473,6 +1473,143 @@ class TestGcd(HurwitzIntTests):
                     method(other)
 
 
+class TestXgcd(HurwitzIntTests):
+    """Tests for xgcd_right and xgcd_left, the gcds with Bezout coefficients"""
+
+    def test_bezout_random(self):
+        """
+        For random pairs of every size, s*a + t*b == g for xgcd_right, and a*s + b*t == g for xgcd_left,
+            where g is the gcd that gcd_right and gcd_left give, normalized or not
+        """
+        rng = random.Random(12_000)
+        for bound_a, bound_b in ((3, 3), (10, 10**4), (10**4, 10**2), (10**12, 10**5), (10**30, 10**12)):
+            for _ in range(60):
+                a = self.rand_hurwitzint(rng, bound_a)
+                b = self.rand_hurwitzint(rng, bound_b)
+                for normalize in (True, False):
+                    g, s, t = a.xgcd_right(b, normalize=normalize)
+                    assert s * a + t * b == g
+                    assert g == a.gcd_right(b, normalize=normalize)
+
+                    g, s, t = a.xgcd_left(b, normalize=normalize)
+                    assert a * s + b * t == g
+                    assert g == a.gcd_left(b, normalize=normalize)
+
+    def test_common_factor(self):
+        """
+        With coprime N(x) and N(y), x*g and y*g share nothing more than g, so xgcd_right finds g's canonical
+            associate as a combination of the two (and xgcd_left does the same for g*x and g*y)
+        """
+        rng = random.Random(13_000)
+        for bound in (3, 10**3, 10**9):
+            for _ in range(40):
+                g = self.rand_hurwitzint(rng, bound)
+                x = self.rand_hurwitzint(rng, bound)
+                y = self.rand_hurwitzint(rng, bound)
+                while gcd(abs(x), abs(y)) != 1:
+                    y = self.rand_hurwitzint(rng, bound)
+
+                d, s, t = (x * g).xgcd_right(y * g)
+                assert d == g.gcd_right(0)
+                assert s * (x * g) + t * (y * g) == d
+
+                d, s, t = (g * x).xgcd_left(g * y)
+                assert d == g.gcd_left(0)
+                assert (g * x) * s + (g * y) * t == d
+
+    def test_coprime_gives_inverses(self):
+        """
+        With coprime norms the gcd is 1, so s*a + t*b == 1 makes s an inverse of a modulo b: s*a - 1 == -t*b is
+            a multiple of b on the right (and for xgcd_left, a*s - 1 == -b*t is one on the left)
+        """
+        rng = random.Random(14_000)
+        for bound in (10, 10**6, 10**20):
+            for _ in range(40):
+                a = self.rand_hurwitzint(rng, bound)
+                b = self.rand_hurwitzint(rng, bound)
+                while gcd(abs(a), abs(b)) != 1:
+                    b = self.rand_hurwitzint(rng, bound)
+
+                g, s, t = a.xgcd_right(b)
+                assert g == 1
+                assert s * a + t * b == 1
+                assert b.divides_right(s * a - 1)
+
+                g, s, t = a.xgcd_left(b)
+                assert g == 1
+                assert a * s + b * t == 1
+                assert b.divides_left(a * s - 1)
+
+    def test_integers(self):
+        """For two integers this is the extended Euclidean algorithm: integer coefficients, and the positive gcd"""
+        for x, y in ((240, 46), (-240, 46), (46, -240), (17, 5), (12, 18), (0, 9), (-9, 0), (10**20 + 39, 10**18 + 3)):
+            for method in (hurwitzint(x).xgcd_right, hurwitzint(x).xgcd_left):
+                g, s, t = method(y)
+
+                assert g == gcd(x, y)
+                assert s * x + t * y == g
+                for coefficient in (s, t):
+                    assert coefficient.is_lipschitz
+                    assert (coefficient.b, coefficient.c, coefficient.d) == (0, 0, 0)
+
+    def test_units(self):
+        """A unit has gcd 1 with anything, on either side"""
+        for u in hurwitzint.UNITS:
+            for b in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(0)):
+                g, s, t = u.xgcd_right(b)
+                assert g == 1
+                assert s * u + t * b == 1
+
+                g, s, t = u.xgcd_left(b)
+                assert g == 1
+                assert u * s + b * t == 1
+
+    def test_zero(self):
+        """
+        With 0 on one side, the gcd is the canonical associate of the other argument, and its coefficient is
+            the unit that makes it so. With 0 on both sides, this is (0, 1, 0)
+        """
+        for a in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(-6)):
+            g, s, t = a.xgcd_right(0)
+            assert (g, t) == (a.gcd_right(0), 0)
+            assert s.is_unit
+            assert s * a == g
+
+            g, s, t = hurwitzint(0).xgcd_right(a)
+            assert (g, s) == (a.gcd_right(0), 0)
+            assert t.is_unit
+            assert t * a == g
+
+            g, s, t = a.xgcd_left(0)
+            assert (g, t) == (a.gcd_left(0), 0)
+            assert s.is_unit
+            assert a * s == g
+
+            g, s, t = hurwitzint(0).xgcd_left(a)
+            assert (g, s) == (a.gcd_left(0), 0)
+            assert t.is_unit
+            assert a * t == g
+
+        for normalize in (True, False):
+            assert hurwitzint(0).xgcd_right(0, normalize=normalize) == (0, 1, 0)
+            assert hurwitzint(0).xgcd_left(0, normalize=normalize) == (0, 1, 0)
+
+    def test_int_and_float_arguments(self):
+        """An int or float argument works like the hurwitzint it equals"""
+        a = hurwitzint(3, -5, 7, 9, half=True) * hurwitzint(1, 1, 0, 0)
+        for m in (2, -2, 82, 41.0, 6.9):
+            assert a.xgcd_right(m) == a.xgcd_right(hurwitzint(m))
+            assert a.xgcd_left(m) == a.xgcd_left(hurwitzint(m))
+
+    def test_unsupported_types_raise_type_error(self):
+        """An extended gcd with something that is not a number raises TypeError, on either side"""
+        x = self.a_int
+        for method in (x.xgcd_right, x.xgcd_left):
+            for other in ("a", None, [1]):
+                with pytest.raises(TypeError):
+                    method(other)
+
+
 class TestContent(HurwitzIntTests):
     """Tests for content, the largest integer that divides a Hurwitz integer"""
 

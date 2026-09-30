@@ -262,6 +262,30 @@ def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H
     return Qa, Qb, Qc, Qd, A - Pa, B - Pb, C - Pc, D - Pd
 
 
+def _sub_mul_numerators(x: tuple[int, int, int, int],
+                        q: tuple[int, int, int, int],
+                        y: tuple[int, int, int, int],
+                        *,
+                        right: bool) -> tuple[int, int, int, int]:
+    """
+    Return x - q*y (or x - y*q if right), with each Hurwitz integer given as its numerators, like _mul_numerators.
+
+    This steps the Bezout coefficients of the extended gcd along with its remainders (see hurwitzint._xgcd).
+
+    Returns:
+        tuple: The numerators of the result, over 2.
+    """
+    xa, xb, xc, xd = x
+    Qa, Qb, Qc, Qd = q
+    ya, yb, yc, yd = y
+    if right:
+        Pa, Pb, Pc, Pd = _mul_numerators(ya, yb, yc, yd, Qa, Qb, Qc, Qd)
+    else:
+        Pa, Pb, Pc, Pd = _mul_numerators(Qa, Qb, Qc, Qd, ya, yb, yc, yd)
+
+    return xa - Pa, xb - Pb, xc - Pc, xd - Pd
+
+
 def _uv_for_prime(p: int) -> tuple[int, int]:
     """
     Return the least u >= 0 for which -1 - u^2 is a square mod the prime p, and v, the least square root of it.
@@ -968,6 +992,52 @@ class hurwitzint:
 
         return self._make(A, B, C, D)
 
+    def _xgcd(self,
+              other: OP_TYPES,
+              *,
+              right: bool = False) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+        """
+        The extended form of _gcd: the same gcd g, with Bezout coefficients s and t.
+
+        _gcd divides on the left (a = q*b + r) for a right gcd, so every remainder it goes through is s*self + t*other
+            for some s and t: the first two are self (s=1, t=0) and other (s=0, t=1), and each one after is
+            a - q*b for the two before it, so its coefficients are those of a, minus q times those of b.
+            With right=True it divides on the right (a = b*q + r) for a left gcd, so every remainder is
+            self*s + other*t, and q goes on the right of the coefficients.
+
+        This runs the same divisions as _gcd, on plain int numerators, so it lands on the same associate.
+
+        Returns:
+            tuple: (g, s, t), with s*self + t*other == g, or with right=True, self*s + other*t == g.
+
+        Raises:
+            TypeError: If other is an unsupported type.
+        """
+        if isinstance(other, _OTHER_OP_TYPES):
+            other = self._from_obj(other)
+
+        if not isinstance(other, hurwitzint):
+            raise TypeError(f"unsupported type for xgcd: {type(other).__name__!r}")
+
+        A, B, C, D = self._a, self._b, self._c, self._d
+        E, F, G, H = other._a, other._b, other._c, other._d
+
+        # The coefficients of A..D and of E..H, as numerators
+        s0, t0 = (2, 0, 0, 0), (0, 0, 0, 0)
+        s1, t1 = (0, 0, 0, 0), (2, 0, 0, 0)
+        while E or F or G or H:
+            n = (_mul(E, E) + _mul(F, F) + _mul(G, G) + _mul(H, H)) >> 2
+            Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right)
+            q = (Qa, Qb, Qc, Qd)
+
+            A, B, C, D, E, F, G, H = E, F, G, H, Ra, Rb, Rc, Rd
+            s0, s1 = s1, _sub_mul_numerators(s0, q, s1, right=right)
+            t0, t1 = t1, _sub_mul_numerators(t0, q, t1, right=right)
+
+        sa, sb, sc, sd = s0
+        ta, tb, tc, td = t0
+        return self._make(A, B, C, D), self._make(sa, sb, sc, sd), self._make(ta, tb, tc, td)
+
     def gcd_right(self,
                   other: OP_TYPES,
                   *,
@@ -1011,6 +1081,52 @@ class hurwitzint:
         """
         g = self._gcd(other, right=True)
         return g._canonical_associate(direction="right")[0] if normalize else g
+
+    def xgcd_right(self,
+                   other: OP_TYPES,
+                   *,
+                   normalize: bool = True) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+        """
+        Extended right gcd: the gcd_right g of self and other, with Bezout coefficients s and t, on the left.
+
+            s*self + t*other == g
+
+        g is the same as self.gcd_right(other, normalize=normalize). Making it canonical multiplies it by a unit
+            on its left, so s and t get the same unit on their left, which keeps the identity. With both self and
+            other 0, this is (0, 1, 0).
+
+        Returns:
+            tuple: (g, s, t), with s*self + t*other == g.
+        """
+        g, s, t = self._xgcd(other)
+        if normalize and g:
+            g, u = g._canonical_associate(direction="left")  # g == u * (the g before)
+            s, t = u * s, u * t
+
+        return g, s, t
+
+    def xgcd_left(self,
+                  other: OP_TYPES,
+                  *,
+                  normalize: bool = True) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+        """
+        Extended left gcd: the gcd_left g of self and other, with Bezout coefficients s and t, on the right.
+
+            self*s + other*t == g
+
+        g is the same as self.gcd_left(other, normalize=normalize). Making it canonical multiplies it by a unit
+            on its right, so s and t get the same unit on their right, which keeps the identity. With both self and
+            other 0, this is (0, 1, 0).
+
+        Returns:
+            tuple: (g, s, t), with self*s + other*t == g.
+        """
+        g, s, t = self._xgcd(other, right=True)
+        if normalize and g:
+            g, u = g._canonical_associate(direction="right")  # g == (the g before) * u
+            s, t = s * u, t * u
+
+        return g, s, t
     # endregion
 
     # region Factoring

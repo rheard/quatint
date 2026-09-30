@@ -23,7 +23,8 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
   - `a.rdivmod(b)` (or `quatint.rdivmod(a, b)`) for **right-quotient** division (`a = b*q + r`)
 - **Exact division** (`exact_div_right`, `exact_div_left`), which gives `None` rather than leave a remainder,
   and **divisibility** tests (`divides_right`, `divides_left`)
-- **Left/right gcd** (`gcd_left`, `gcd_right`) built on the corresponding division
+- **Left/right gcd** (`gcd_left`, `gcd_right`) built on the corresponding division,
+  and **extended gcd** (`xgcd_left`, `xgcd_right`) with Bézout coefficients
 - **Deterministic factorization** into `content`, `unit`, and Hurwitz primes (by prime norms)
 
 New helper methods on every Hurwitz integer value:
@@ -149,6 +150,26 @@ A gcd is only unique up to a unit on one side, so both return a canonical choice
 from quatint import hurwitzint
 
 assert hurwitzint(-6).gcd_right(15) == 3
+```
+
+### Extended gcd
+
+`xgcd_right` and `xgcd_left` return the same gcd `g`, along with Bézout coefficients `s` and `t` that make it out of the two arguments.
+    A right gcd is a combination with coefficients on the left, and a left gcd one with coefficients on the right:
+
+```python
+from quatint import hurwitzint
+
+a = hurwitzint(2, 3, 4, 53)
+b = hurwitzint(1, 2, 3, 4)
+
+g, s, t = a.xgcd_right(b)
+assert g == a.gcd_right(b)
+assert s * a + t * b == g
+
+g, s, t = a.xgcd_left(b)
+assert g == a.gcd_left(b)
+assert a * s + b * t == g
 ```
 
 ### Primes of a given norm
@@ -281,6 +302,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `b.divides_right(a)` / `b.divides_left(a)` → whether `a == q*b` / `a == b*q` for some `q`
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
+* `a.xgcd_right(b)` / `a.xgcd_left(b)` → `(g, s, t)` with `s*a + t*b == g` / `a*s + b*t == g`
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`
