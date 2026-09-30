@@ -78,12 +78,18 @@ class HurwitzIntTests:
         assert isinstance(res_int, hurwitzint)
 
     @staticmethod
-    def wide_search_values():
-        """Every Lipschitz integer with components in [-3, 3], and every half-integer with numerators in [-5, 5]"""
-        for a, b, c, d in product(range(-3, 4), repeat=4):
+    def wide_search_values(bound: int = 3):
+        """
+        Every Lipschitz integer with components in [-bound, bound],
+            and every half-integer with numerators in [1 - 2*bound, 2*bound - 1] (so [-5, 5] for the default bound)
+
+        Yields:
+            hurwitzint: Each of those values.
+        """
+        for a, b, c, d in product(range(-bound, bound + 1), repeat=4):
             yield hurwitzint(a, b, c, d)
 
-        for a, b, c, d in product(range(-5, 6, 2), repeat=4):
+        for a, b, c, d in product(range(1 - 2 * bound, 2 * bound, 2), repeat=4):
             yield hurwitzint(a, b, c, d, half=True)
 
     @staticmethod
@@ -833,6 +839,105 @@ class TestRDiv(HurwitzIntTests):
         for method in (x.rdivmod, x.rfloordiv, x.rmod, x.rtruediv):
             with pytest.raises(TypeError):
                 method("a")
+
+
+class TestExactDiv(HurwitzIntTests):
+    """Tests for exact_div_right and exact_div_left"""
+
+    def test_examples(self):
+        """Some quotients worked out by hand"""
+        # y = 1+i+j has norm 3. It divides i*y on the right, but not on the left: y^-1 * i*y would be (i+2j+2k)/3
+        y = hurwitzint(1, 1, 1, 0)
+        x = hurwitzint(0, 1, 0, 0) * y
+        assert x == hurwitzint(-1, 1, 0, 1)
+        assert x.exact_div_right(y) == hurwitzint(0, 1, 0, 0)
+        assert x.exact_div_left(y) is None
+
+        # The quotient can be a true half-integer, like (1+i+j+k) / 2
+        assert hurwitzint(1, 1, 1, 1).exact_div_right(2) == hurwitzint(1, 1, 1, 1, half=True)
+        assert hurwitzint(1, 1, 1, 1).exact_div_left(2) == hurwitzint(1, 1, 1, 1, half=True)
+
+        # 2 / (1+i) is 1-i, but 1 / (1+i) is (1-i)/2: numerators 1, -1, 0, 0 of mixed parity, so no Hurwitz integer
+        assert hurwitzint(2).exact_div_right(hurwitzint(1, 1, 0, 0)) == hurwitzint(1, -1, 0, 0)
+        assert hurwitzint(2).exact_div_left(hurwitzint(1, 1, 0, 0)) == hurwitzint(1, -1, 0, 0)
+        assert hurwitzint(1).exact_div_right(hurwitzint(1, 1, 0, 0)) is None
+        assert hurwitzint(1).exact_div_left(hurwitzint(1, 1, 0, 0)) is None
+
+    def test_matches_divmod(self):
+        """
+        For every small pair, exact_div_right gives the quotient of divmod when its remainder is 0, and None when
+            it is not, and exact_div_left does the same for rdivmod
+        """
+        for y in self.division_divisors:
+            for x in self.wide_search_values(2):
+                q, r = divmod(x, y)
+                if r:
+                    assert x.exact_div_right(y) is None
+                else:
+                    assert x.exact_div_right(y) == q
+
+                q, r = rdivmod(x, y)
+                if r:
+                    assert x.exact_div_left(y) is None
+                else:
+                    assert x.exact_div_left(y) == q
+
+    def test_exact_multiples(self):
+        """
+        q*y divides by y on the right and y*q on the left, back to exactly q, for random q and y of every size.
+            Adding 1 leaves neither one a multiple of y, unless y is a unit (y*w == 1 + y*q would make 1 a multiple)
+        """
+        rng = random.Random(9_000)
+        for bound in (3, 10**4, 10**12, 10**30):
+            for _ in range(250):
+                q = self.rand_hurwitzint(rng, bound)
+                y = self.rand_hurwitzint(rng, bound)
+
+                assert (q * y).exact_div_right(y) == q
+                assert (y * q).exact_div_left(y) == q
+
+                if not y.is_unit:
+                    assert (q * y + 1).exact_div_right(y) is None
+                    assert (y * q + 1).exact_div_left(y) is None
+
+    def test_divide_by_units(self):
+        """Every unit u divides everything exactly: the quotients are a * u^-1 on the right, and u^-1 * a on the left"""
+        for u in hurwitzint.UNITS:
+            for a in self.division_divisors:
+                assert a.exact_div_right(u) == a * u.inverse()
+                assert a.exact_div_left(u) == u.inverse() * a
+
+    def test_int_and_float_divisors(self):
+        """An int or float divisor divides like the hurwitzint it equals, and the same on either side"""
+        for a in (hurwitzint(6, -4, 2, 0), hurwitzint(3, 3, 3, 3), hurwitzint(3, -5, 7, 9, half=True)):
+            for m in (1, -1, 2, 3, -3, 3.0, -2.0, 2.9):
+                expected = a.exact_div_right(hurwitzint(m))
+
+                assert a.exact_div_right(m) == expected
+                assert a.exact_div_left(m) == expected
+
+        assert hurwitzint(6, -4, 2, 0).exact_div_right(2) == hurwitzint(3, -2, 1, 0)
+        assert hurwitzint(6, -4, 2, 0).exact_div_right(4) is None
+
+    def test_zero(self):
+        """0 divides exactly into 0 by anything, and dividing by 0 raises ZeroDivisionError"""
+        for y in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), 7):
+            assert hurwitzint(0).exact_div_right(y) == 0
+            assert hurwitzint(0).exact_div_left(y) == 0
+
+        x = self.a_int
+        for method in (x.exact_div_right, x.exact_div_left):
+            for zero in (hurwitzint(0), 0, 0.0):
+                with pytest.raises(ZeroDivisionError):
+                    method(zero)
+
+    def test_unsupported_types_raise_type_error(self):
+        """Exact division by something that is not a number raises TypeError, on either side"""
+        x = self.a_int
+        for method in (x.exact_div_right, x.exact_div_left):
+            for other in ("a", None, [1]):
+                with pytest.raises(TypeError):
+                    method(other)
 
 
 class TestRoundDivTiesAwayFromZero:
