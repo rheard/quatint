@@ -175,7 +175,7 @@ assert prod_left((a, b, c)) == c * b * a
 
 The detailed methods return a compact normal form, in a class called `NonCommutativeFactorization` with these properties:
 
-* `content`: maximal positive integer scalar dividing the element (in the Hurwitz sense)
+* `content`: maximal positive integer scalar dividing the element (in the Hurwitz sense), or 1 after `expand_content()`
 * `unit`: a norm-1 Hurwitz unit (deterministically chosen)
 * `primes`: Hurwitz primes (each with prime rational norm), normalized via unit migration
 
@@ -192,6 +192,26 @@ assert fr.prod_right() == n
 fl = n.factor_left_detail()
 assert fl.prod_left() == n
 ```
+
+#### Factoring the content
+
+`content` stays an integer, since that is unique, and its factorization into Hurwitz primes is not: every rational prime `p` is `conj(P) * P` for a Hurwitz prime `P` of norm `p`,
+    but `p + 1` of those `P` give genuinely different factorizations (just one for `p = 2`).
+    `expand_content()` makes a fixed choice, `P = hurwitzint.prime_of_norm(p)`, and returns the factorization with those primes merged in by norm, and `content` set to 1:
+
+```python
+from quatint import hurwitzint
+
+f = hurwitzint(527).factor_right_detail()  # 527 = 17 * 31
+print(f.content, f.primes)  # 527 ()
+
+f = f.expand_content()
+print(f.content, [abs(p) for p in f.primes])  # 1 [17, 17, 31, 31]
+assert f.prod_right() == 527
+```
+
+That means factoring `content` as an integer, which the detailed methods never do, and which can be slow for a big content with big prime factors.
+    If you already know them, pass them in to skip that: `f.expand_content(factors={17: 1, 31: 1})`.
 
 ## Representation & guarantees
 
@@ -225,3 +245,4 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`
+* `NonCommutativeFactorization.expand_content(factors=None)` → the same factorization, with the content factored into Hurwitz primes too

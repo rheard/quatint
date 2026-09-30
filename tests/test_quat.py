@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from hurwitz import HurwitzQuaternion
-from sympy import isprime
+from sympy import factorint, isprime
 
 import quatint.quat
 
@@ -1650,6 +1650,147 @@ class TestFactorLeft(HurwitzIntTests):
 
                 assert prod_left(factors) == n
                 assert all(isprime(abs(p)) for p in factors[1:])
+
+
+class TestExpandContent(HurwitzIntTests):
+    """Tests for NonCommutativeFactorization.expand_content, which factors the content into Hurwitz primes too"""
+
+    @staticmethod
+    def detail(n: hurwitzint, direction: str) -> NonCommutativeFactorization:
+        """The detail factorization of n in the given direction"""
+        return n.factor_right_detail() if direction == "right" else n.factor_left_detail()
+
+    @staticmethod
+    def assert_expanded(n: hurwitzint, factors: NonCommutativeFactorization):
+        """Validate an expanded factorization: exact, content 1, and its primes sorted by norm and each canonical"""
+        assert factors.prod() == n
+        assert factors.content == 1
+        assert abs(factors.unit) == 1
+
+        norms = [abs(p) for p in factors.primes]
+        assert norms == sorted(norms)
+        assert all(isprime(norm) for norm in norms)
+
+        # Canonical like the other primes: the largest u*P in a right factorization, and the largest P*u in a left one
+        for p in factors.primes:
+            if factors.direction == "right":
+                assert all(tuple(u * p) <= tuple(p) for u in hurwitzint.UNITS)
+            else:
+                assert all(tuple(p * u) <= tuple(p) for u in hurwitzint.UNITS)
+
+    def test_examples(self):
+        """The choice of primes is fixed, so pin some of them"""
+        one_plus_i = hurwitzint(1, 1, 0, 0)
+        for direction in ("right", "left"):
+            factors = self.detail(hurwitzint(2), direction).expand_content()
+            assert factors == NonCommutativeFactorization(content=1, unit=hurwitzint(0, -1, 0, 0),
+                                                          primes=(one_plus_i, one_plus_i), direction=direction)
+
+        # 527 = 17 * 31, and each of those is a prime of norm p times its conjugate
+        factors = hurwitzint(527).factor_right_detail().expand_content()
+        assert factors.unit == 1
+        assert factors.primes == (hurwitzint(4, 0, 1, 0), hurwitzint(4, 0, -1, 0),
+                                  hurwitzint(5, -2, 1, 1), hurwitzint(5, 2, -1, -1))
+
+    def test_integers(self):
+        """An integer's primes all come from its content, a pair of norm p for each prime factor p"""
+        for m in range(-60, 61):
+            if not m:
+                continue
+
+            for direction in ("right", "left"):
+                factors = self.detail(hurwitzint(m), direction).expand_content()
+
+                self.assert_expanded(hurwitzint(m), factors)
+                assert [abs(p) for p in factors.primes] == [
+                    q for q, e in sorted(factorint(abs(m)).items()) for _ in range(2 * e)
+                ]
+
+    def test_content_meets_primes_of_its_norm(self):
+        """Multiply every Hurwitz integer of norm p (2, 3 or 5) by p, so the content's primes meet ones of equal norm"""
+        for n in self.wide_search_values():
+            p = abs(n)
+            if p in {2, 3, 5}:
+                for direction in ("right", "left"):
+                    self.assert_expanded(p * n, self.detail(p * n, direction).expand_content())
+
+    def test_random_products(self):
+        """Seeded random products with content up to 60, so with repeated primes, in both directions"""
+        rng = random.Random(9_004)
+        for bound in (3, 10, 10**3):
+            for _ in range(25):
+                n = self.rand_hurwitzint(rng, bound) * self.rand_hurwitzint(rng, bound) * rng.randint(2, 60)
+                for direction in ("right", "left"):
+                    factors = self.detail(n, direction).expand_content()
+
+                    self.assert_expanded(n, factors)
+                    assert factors.expand_content() is factors  # Nothing is left to expand
+
+    def test_normal_form(self):
+        """A unit on the same side as the unit only changes the unit, and never the primes"""
+        for n in (hurwitzint(6), hurwitzint(6, 2, 4, 0), 12 * hurwitzint(1, 1, 1, 0),
+                  30 * hurwitzint(3, 5, 7, 9, half=True)):
+            right = n.factor_right_detail().expand_content()
+            left = n.factor_left_detail().expand_content()
+            for u in hurwitzint.UNITS:
+                moved = (u * n).factor_right_detail().expand_content()
+                assert moved.primes == right.primes
+                assert moved.unit == u * right.unit
+
+                moved = (n * u).factor_left_detail().expand_content()
+                assert moved.primes == left.primes
+                assert moved.unit == left.unit * u
+
+    def test_nothing_to_expand(self):
+        """Zero, and anything with content 1, come back as the very same factorization"""
+        for n in (hurwitzint(0), hurwitzint(1, 1, 0, 0), self.b_int, *hurwitzint.UNITS):
+            for direction in ("right", "left"):
+                factors = self.detail(n, direction)
+                assert factors.expand_content() is factors
+
+    def test_known_factors(self):
+        """Given the content's factors, the result is the same, and a content too big to factor quickly is fine"""
+        rng = random.Random(9_005)
+        for _ in range(20):
+            n = self.rand_hurwitzint(rng, 10) * rng.randint(2, 500)
+            for direction in ("right", "left"):
+                factors = self.detail(n, direction)
+                assert factors.expand_content(factors=factorint(factors.content)) == factors.expand_content()
+
+        # Two 18-digit primes. Factoring their product takes sympy seconds, but with the factors given this is quick.
+        p, q = 100000000000000003, 300000000000000011
+        assert isprime(p)
+        assert isprime(q)
+
+        n = p * q * hurwitzint(3, 5, 7, 9, half=True)
+        for direction in ("right", "left"):
+            factors = self.detail(n, direction)
+            assert factors.content == p * q
+            self.assert_expanded(n, factors.expand_content(factors={p: 1, q: 1}))
+
+    def test_bad_factors(self):
+        """The factors given have to be the content's prime factorization, with nothing but ints, in both builds"""
+        factors = hurwitzint(527).factor_right_detail()  # 17 * 31
+        for bad in ({17: 1}, {17: 1, 31: 2}, {17: 2, 31: -1}, {527: 1}, {-17: 1, -31: 1}):
+            with pytest.raises(ValueError, match=r"content|prime"):
+                factors.expand_content(factors=bad)
+
+        for bad in ({17.0: 1, 31: 1}, {17: 1.0, 31: 1}):
+            with pytest.raises(TypeError):
+                factors.expand_content(factors=bad)
+
+        # A zero exponent changes nothing
+        assert factors.expand_content(factors={2: 0, 17: 1, 31: 1}) == factors.expand_content()
+
+        # 0 has no factorization, and the only one of 1 is empty
+        with pytest.raises(ValueError, match="content"):
+            hurwitzint(0).factor_right_detail().expand_content(factors={})
+
+        with pytest.raises(ValueError, match="content"):
+            hurwitzint(1).factor_right_detail().expand_content(factors={5: 1})
+
+        factors = hurwitzint(1).factor_right_detail()
+        assert factors.expand_content(factors={}) is factors
 
 
 class TestRepr(HurwitzIntTests):

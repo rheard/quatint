@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from math import gcd, prod
 from typing import ClassVar, Iterable, Iterator, Literal, Union
@@ -21,7 +22,10 @@ class NonCommutativeFactorization:
         direction="right":  x = content * unit * P1 * P2 * ... * Pk
         direction="left":   x = content * Pk * ... * P2 * P1 * unit
 
-    - content is a positive integer (maximal integer dividing x).
+    - content is the integer part of x left unfactored: from factor_right_detail or factor_left_detail, the largest
+        positive integer dividing x (0 for x = 0). That integer is unique, but its factorization into Hurwitz primes
+        is not, so it is left to expand_content, which makes a fixed choice, moves those primes in with the others,
+        and leaves content 1.
     - unit is a Hurwitz unit (norm 1).
     - Pi are Hurwitz primes (norm is a rational prime) sorted by norm, smallest first,
         each normalized by unit-migration.
@@ -30,6 +34,79 @@ class NonCommutativeFactorization:
     unit: hurwitzint
     primes: tuple[hurwitzint, ...]
     direction: Literal["left", "right"]
+
+    def expand_content(self, factors: dict[int, int] | None = None) -> NonCommutativeFactorization:
+        """
+        Return this factorization with the content factored into Hurwitz primes too, so that content becomes 1.
+
+        Every rational prime p is conj(P) * P for any Hurwitz prime P of norm p, but there is no unique way to pick P:
+            p + 1 of them (just 1 for p=2) are not associates of each other, and each gives a different factorization
+            (Conway & Smith call this recombination). So this makes a fixed choice,
+            P = hurwitzint.prime_of_norm(p, direction=self.direction), for every p.
+
+        Each p of the content goes in as the pair conj(P), P, ahead of any other primes of norm p. Then every factor
+            is made canonical again, working from the far end toward the unit: each factor takes in the unit left
+            over from the one before, and passes on what it has to give up to be canonical, until the last one
+            joins `unit`. That is unit migration, so the product never changes, and the result keeps every guarantee
+            of the primes from factor_right_detail and factor_left_detail: sorted by norm, each canonical, and
+            a unit on the same side of x as `unit` only changes `unit`.
+
+        This has to factor the content as an integer, which factor_right_detail and factor_left_detail never do,
+            and that is slow for a big content with big prime factors. If they are known, pass them as factors
+            ({prime: exponent}, like sympy.factorint returns) to skip it.
+
+        Args:
+            factors: The prime factorization of content, if it is already known.
+
+        Returns:
+            NonCommutativeFactorization: The expanded factorization, or this one if content is 0 (which has no
+                factorization) or 1 (which leaves nothing to expand).
+
+        Raises:
+            TypeError: If factors has anything but ints in it.
+            ValueError: If factors does not multiply to content, or has a key that is not prime.
+        """
+        m = self.content
+        if factors is not None:
+            # The mypyc build rejects anything but ints before getting here, so this makes pure Python match it
+            if not all(isinstance(p, int) and isinstance(e, int) for p, e in factors.items()):
+                raise TypeError("factors must map int primes to int exponents")
+
+            # prime_of_norm checks that each p is prime, below
+            if prod(p**e for p, e in factors.items()) != m:
+                raise ValueError(f"factors must multiply to the content, {m}")
+
+        if m <= 1:
+            return self
+
+        nf = factorint(m) if factors is None else factors
+
+        # Each p of the content goes in as conj(P), P, which is p whichever way it is multiplied out:
+        #   conj(P) * P in a right factorization, and P * conj(P) in a left one (whose product runs right to left)
+        primes = list(self.primes)
+        norms = [abs(prime) for prime in primes]
+        for p in sorted(nf):
+            P = hurwitzint.prime_of_norm(p, direction=self.direction)
+            i = bisect_left(norms, p)
+            primes[i:i] = [P.conjugate(), P] * nf[p]
+            norms[i:i] = [p] * (2 * nf[p])
+
+        # Make every factor canonical again, from the far end toward the unit, carrying the leftover units along
+        right = self.direction == "right"
+        carry = hurwitzint(1)
+        for i in range(len(primes) - 1, -1, -1):
+            if right:
+                # canon == u * (prime * carry), so prime * carry == conj(u) * canon, and conj(u) moves on to the left
+                canon, u = (primes[i] * carry)._canonical_associate("left")
+            else:
+                # canon == (carry * prime) * u, so carry * prime == canon * conj(u), and conj(u) moves on to the right
+                canon, u = (carry * primes[i])._canonical_associate("right")
+
+            primes[i] = canon
+            carry = u.conjugate()  # A unit's inverse is its conjugate
+
+        unit = self.unit * carry if right else carry * self.unit
+        return NonCommutativeFactorization(content=1, unit=unit, primes=tuple(primes), direction=self.direction)
 
     def prod(self):
         """Recreate the number using prod_right or prod_left"""
@@ -960,8 +1037,9 @@ class hurwitzint:
             with its norm, and the leftover unit migrates left, ending up in `unit`.
 
         Notes:
-          - We do NOT expand `content` into Hurwitz primes by default because scalar
-            factorization is exactly where recombination/nonuniqueness explodes.
+          - `content` stays an integer, since that is unique, and its factorization into Hurwitz primes is not
+            (recombination). It also means the content never has to be factored as an integer, which can be slow.
+            `expand_content()` on the result does both, making a fixed choice of primes.
           - Each Pi is irreducible because its norm is a rational prime.
 
         Returns:
