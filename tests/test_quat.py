@@ -2180,6 +2180,53 @@ class TestExpandContent(HurwitzIntTests):
         assert factors.expand_content(factors={}) is factors
 
 
+class TestFactorintTypes(HurwitzIntTests):
+    """sympy.factorint can answer with integers that are not ints, which the mypyc build rejects where an int goes"""
+
+    def test_non_int_factors(self, monkeypatch: pytest.MonkeyPatch):
+        """
+        Factoring gives the same answers when factorint's primes and exponents are not ints.
+
+        With gmpy2 or python-flint installed, sympy 1.13 and later return their mpz or fmpz for some factors
+            (the first factorint(7 * 104729**3) comes back as {7: 1, mpz(104729): mpz(3)}).
+        """
+
+        class NotInt:
+            # Like mpz: equal to, ordered and hashed like its value, and converted by int(), but not an int
+            def __init__(self, value: int):
+                self.value = value
+
+            def __int__(self) -> int:
+                return self.value
+
+            def __index__(self) -> int:
+                return self.value
+
+            def __eq__(self, other: object) -> bool:
+                return self.value == int(other)
+
+            def __hash__(self) -> int:
+                return hash(self.value)
+
+            def __lt__(self, other: object) -> bool:
+                return self.value < int(other)
+
+            def __gt__(self, other: object) -> bool:
+                return self.value > int(other)
+
+        # Primes of the norm, of the content, and of both
+        values = (hurwitzint(2, 3, 4, 53), hurwitzint(527), 30 * hurwitzint(3, 5, 7, 9, half=True))
+        expected = [(n.factor_right_detail(), n.factor_left_detail(), n.factor_right(), n.factor_left())
+                    for n in values]
+
+        real = quatint.quat.factorint
+        monkeypatch.setattr(quatint.quat, "factorint", lambda n: {NotInt(p): NotInt(e) for p, e in real(n).items()})
+        assert all(type(p) is NotInt for p in quatint.quat.factorint(30))
+
+        for n, answers in zip(values, expected):
+            assert (n.factor_right_detail(), n.factor_left_detail(), n.factor_right(), n.factor_left()) == answers
+
+
 class TestRepr(HurwitzIntTests):
     """Validate the repr"""
 

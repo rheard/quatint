@@ -3,6 +3,10 @@ requires = [
     "mypy[mypyc]",
     "setuptools",
 
+    # This is for the build system, only used for mypyc linkage.
+    #   Below versions in [project] are what will be installed and used with this project at runtime
+    # TODO: Sympy began adding mypy type-hints and removed the py.typed file.
+    #   It is actively being worked on, see https://github.com/sympy/sympy/issues/17945
     "sympy<=1.12.1",
 ]
 
@@ -29,9 +33,11 @@ classifiers = [
 ]
 keywords = ["complex", "math"]
 dependencies = [
-    # TODO: Sympy began adding mypy type-hints and removed the py.typed file.
-    #   It is actively being worked on, see https://github.com/sympy/sympy/issues/17945
-    "sympy<=1.12.1",
+    # Only the build needs sympy <= 1.12.1, for its py.typed (see [build-system] above). At runtime the compiled
+    #   wheel calls into sympy like any other Python code, so any release with factorint and isprime would do, but
+    #   1.8 and older import distutils, which Python 3.12 removed. The floor matters since pip keeps an older sympy
+    #   that is already installed.
+    "sympy>=1.9",
 ]
 
 [project.optional-dependencies]

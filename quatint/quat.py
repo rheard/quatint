@@ -79,7 +79,7 @@ class NonCommutativeFactorization:
         if m <= 1:
             return self
 
-        nf = factorint(m) if factors is None else factors
+        nf = _factorint(m) if factors is None else factors
 
         # Each p of the content goes in as conj(P), P, which is p whichever way it is multiplied out:
         #   conj(P) * P in a right factorization, and P * conj(P) in a left one (whose product runs right to left)
@@ -317,6 +317,21 @@ def _uv_for_prime(p: int) -> tuple[int, int]:
             return u, min(r, p - r)
 
         u += 1
+
+
+def _factorint(n: int) -> dict[int, int]:
+    """
+    Return sympy.factorint(n), with every prime and exponent a plain int.
+
+    With gmpy2 or python-flint installed, sympy 1.13 and later can return their own integer types (mpz or fmpz) for
+        some factors, depending on which of its algorithms found them: the first factorint(7 * 104729**3) comes back
+        as {7: 1, mpz(104729): mpz(3)}. Those are not ints, so the mypyc build would raise TypeError wherever one
+        reached a parameter typed int.
+
+    Returns:
+        dict: {prime: exponent}, like sympy.factorint.
+    """
+    return {int(p): int(e) for p, e in factorint(n).items()}
 
 
 class hurwitzint:
@@ -1331,7 +1346,7 @@ class hurwitzint:
 
         # Now q is primitive (or at least has no large integer content).
         n = abs(q)
-        nf = factorint(n)
+        nf = _factorint(n)
 
         primes: list[hurwitzint] = []
         # Largest norm first, since the primes come off the right and get reversed below
@@ -1402,7 +1417,7 @@ class hurwitzint:
             q = q.rfloordiv(hurwitzint(m, 0, 0, 0))
 
         n = abs(q)
-        nf = factorint(n)
+        nf = _factorint(n)
 
         primes: list[hurwitzint] = []
         # Largest norm first, since the primes come off the left and get reversed below
