@@ -46,6 +46,29 @@ class NonCommutativeFactorization:
         return prod_left(self.primes, start=self.unit * self.content)
 
 
+def _mul(x: int, y: int) -> int:
+    """
+    Return x * y, worked out from the magnitudes of x and y.
+
+    This only matters for speed under mypyc. Its int multiplication is a plain machine multiply when both operands
+        are non-negative and below 2**30, but for anything else it boxes both ints and calls Python's own
+        multiplication (see CPyTagged_IsMultiplyOverflow in mypyc's lib-rt/CPy.h). The parts of a quaternion are
+        negative about half the time, so the hot paths multiply through this, which keeps products of small values on
+        the fast path whatever their signs. (In pure Python it is slower than a plain x * y, since each product
+        becomes a function call.)
+
+    Returns:
+        int: x * y.
+    """
+    if x < 0:
+        if y < 0:
+            return (-x) * (-y)
+        return -((-x) * y)
+    if y < 0:
+        return -(x * (-y))
+    return x * y
+
+
 def _round_div_ties_away_from_zero(a: int, b: int) -> int:
     """Round a/b to nearest integer; ties go away from zero. b must be > 0."""
     if b <= 0:
@@ -67,16 +90,16 @@ def _nearest_with_parity(U: int, Q0: int, parity: int, n: int) -> tuple[int, int
         tuple: The (Q, metric).
     """
     if parity == (Q0 & 1):
-        d = Q0 * n - U
-        return Q0, d * d
+        d = _mul(Q0, n) - U
+        return Q0, _mul(d, d)
 
     # Nearest integer with opposite parity must be Q0-1 or Q0+1.
     Qm = Q0 - 1
     Qp = Q0 + 1
-    dm = Qm * n - U
-    dp = Qp * n - U
-    mm = dm * dm
-    mp = dp * dp
+    dm = _mul(Qm, n) - U
+    dp = _mul(Qp, n) - U
+    mm = _mul(dm, dm)
+    mp = _mul(dp, dp)
 
     # Deterministic tie-break: prefer the smaller Q (Qm) on equal metric.
     if mm <= mp:
@@ -94,10 +117,10 @@ def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: i
     Returns:
         tuple: The product's numerators, over 2.
     """
-    return ((A * E - B * F - C * G - D * H) // 2,
-            (A * F + B * E + C * H - D * G) // 2,
-            (A * G - B * H + C * E + D * F) // 2,
-            (A * H + B * G - C * F + D * E) // 2)
+    return ((_mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)) // 2,
+            (_mul(A, F) + _mul(B, E) + _mul(C, H) - _mul(D, G)) // 2,
+            (_mul(A, G) - _mul(B, H) + _mul(C, E) + _mul(D, F)) // 2,
+            (_mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)) // 2)
 
 
 def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int, n: int, *, right: bool) \
@@ -336,10 +359,10 @@ class hurwitzint:
         E, F, G, H = other._a, other._b, other._c, other._d
 
         # (a,b,c,d)*(e,f,g,h) with i^2=j^2=k^2=ijk=-1:
-        P = A * E - B * F - C * G - D * H
-        Q = A * F + B * E + C * H - D * G
-        R = A * G - B * H + C * E + D * F
-        S = A * H + B * G - C * F + D * E
+        P = _mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)
+        Q = _mul(A, F) + _mul(B, E) + _mul(C, H) - _mul(D, G)
+        R = _mul(A, G) - _mul(B, H) + _mul(C, E) + _mul(D, F)
+        S = _mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)
 
         # Must be divisible by 2 to land back in the Hurwitz order.
         if (P & 1) or (Q & 1) or (R & 1) or (S & 1):
@@ -529,7 +552,7 @@ class hurwitzint:
         Raises:
             ArithmeticError: If there is a non-integral norm due to parity violation.
         """
-        num = self._a * self._a + self._b * self._b + self._c * self._c + self._d * self._d
+        num = _mul(self._a, self._a) + _mul(self._b, self._b) + _mul(self._c, self._c) + _mul(self._d, self._d)
         # q, r = divmod(num, 4)   # Below is ever so slightly faster it seems, and this is an important operation
         r = num & 3
         q = num >> 2
@@ -679,7 +702,7 @@ class hurwitzint:
         A, B, C, D = self._a, self._b, self._c, self._d
         E, F, G, H = other._a, other._b, other._c, other._d
         while E or F or G or H:
-            n = (E * E + F * F + G * G + H * H) >> 2
+            n = (_mul(E, E) + _mul(F, F) + _mul(G, G) + _mul(H, H)) >> 2
             _, _, _, _, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right)
             A, B, C, D, E, F, G, H = E, F, G, H, Ra, Rb, Rc, Rd
 
@@ -780,7 +803,7 @@ class hurwitzint:
 
             # The real part is the same for u*p as for p*u, and on its own it rules out most candidates,
             #   so the rest of the product is only worked out for a real part at least as large as the best one's
-            real = (A * E - B * F - C * G - D * H) // 2
+            real = (_mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)) // 2
             if real < Ba:
                 continue
 

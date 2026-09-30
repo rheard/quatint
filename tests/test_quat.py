@@ -855,6 +855,18 @@ class TestRoundDivTiesAwayFromZero:
                 quatint.quat._round_div_ties_away_from_zero(5, b)
 
 
+class TestMulHelper:
+    """Tests for _mul, the multiplication that the arithmetic's hot paths go through"""
+
+    def test_matches_plain_multiplication(self):
+        """It gives exactly x * y for every combination of signs, with sizes on both sides of mypyc's limits"""
+        magnitudes = (0, 1, 2, 3, 2**30 - 1, 2**30, 2**31 + 5, 2**62 - 1, 2**62, 2**63 + 1, 10**30 + 7)
+        values = [sign * m for m in magnitudes for sign in (1, -1)]
+        for x in values:
+            for y in values:
+                assert quatint.quat._mul(x, y) == x * y
+
+
 class TestIsUnit(HurwitzIntTests):
     """Tests for is_unit"""
 
