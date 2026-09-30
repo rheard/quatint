@@ -1507,8 +1507,17 @@ class TestFactorRight(HurwitzIntTests):
         for n in (hurwitzint(0), *hurwitzint.UNITS, *primes):
             assert n.factor_right() == (n,)
 
+    def test_content_is_factored(self):
+        """The content is factored too, so every factor is a Hurwitz prime, even for a plain integer"""
+        for n, norms in ((hurwitzint(527), [17, 17, 31, 31]), (hurwitzint(2), [2, 2]),
+                         (hurwitzint(-12), [2, 2, 2, 2, 3, 3]), (hurwitzint(6, 2, 4, 0), [2, 2, 2, 7])):
+            factors = n.factor_right()
+
+            assert prod_right(factors) == n
+            assert [abs(p) for p in factors] == norms
+
     def test_random_products(self):
-        """For seeded random products, the factors multiply back with prod_right, and all but the first are primes"""
+        """For seeded random products, the factors multiply back with prod_right, and every one is a prime"""
         rng = random.Random(9_002)
         for bound in (10, 10**3):
             for _ in range(20):
@@ -1516,7 +1525,7 @@ class TestFactorRight(HurwitzIntTests):
                 factors = n.factor_right()
 
                 assert prod_right(factors) == n
-                assert all(isprime(abs(p)) for p in factors[1:])
+                assert all(isprime(abs(p)) for p in factors)
 
 
 class TestFactorLeftDetail(HurwitzIntTests):
@@ -1640,8 +1649,17 @@ class TestFactorLeft(HurwitzIntTests):
         for n in (hurwitzint(0), *hurwitzint.UNITS, *primes):
             assert n.factor_left() == (n,)
 
+    def test_content_is_factored(self):
+        """The content is factored too, so every factor is a Hurwitz prime, even for a plain integer"""
+        for n, norms in ((hurwitzint(527), [17, 17, 31, 31]), (hurwitzint(2), [2, 2]),
+                         (hurwitzint(-12), [2, 2, 2, 2, 3, 3]), (hurwitzint(6, 2, 4, 0), [2, 2, 2, 7])):
+            factors = n.factor_left()
+
+            assert prod_left(factors) == n
+            assert [abs(p) for p in factors] == norms
+
     def test_random_products(self):
-        """For seeded random products, the factors multiply back with prod_left, and all but the first are primes"""
+        """For seeded random products, the factors multiply back with prod_left, and every one is a prime"""
         rng = random.Random(9_003)
         for bound in (10, 10**3):
             for _ in range(20):
@@ -1649,7 +1667,7 @@ class TestFactorLeft(HurwitzIntTests):
                 factors = n.factor_left()
 
                 assert prod_left(factors) == n
-                assert all(isprime(abs(p)) for p in factors[1:])
+                assert all(isprime(abs(p)) for p in factors)
 
 
 class TestExpandContent(HurwitzIntTests):

@@ -1091,15 +1091,20 @@ class hurwitzint:
                                            direction="right")
 
     def factor_right(self) -> tuple[hurwitzint, ...]:
-        """Return a plain right-factor list whose product via `prod_right` is exactly `self`."""
-        f = self.factor_right_detail()
-        unit = f.unit
-        factors = f.primes
-        scaler = f.content
+        """
+        Return the Hurwitz primes of self as a plain tuple, whose product via `prod_right` is exactly `self`.
 
-        if factors:
-            first = unit * factors[0] * scaler
-            return first, *factors[1:]
+        This is `factor_right_detail().expand_content()` with the unit folded into the first prime, so every factor
+            is a Hurwitz prime (its norm is a rational prime), including those of the content. That means factoring
+            the content as an integer, which can be slow for a big content with big prime factors, and which
+            `factor_right_detail` never does. Zero and the units have no prime factors, so they come back as themselves.
+
+        Returns:
+            tuple: The factors of self.
+        """
+        f = self.factor_right_detail().expand_content()
+        if f.primes:
+            return f.unit * f.primes[0], *f.primes[1:]
 
         return (self,)
 
@@ -1157,7 +1162,10 @@ class hurwitzint:
 
     def factor_left(self) -> tuple[hurwitzint, ...]:
         """
-        Return a plain left-factor list whose product via `prod_left` is exactly `self`.
+        Return the Hurwitz primes of self as a plain tuple, whose product via `prod_left` is exactly `self`.
+
+        This is `factor_left_detail().expand_content()` with the unit folded into the first prime, the mirror image
+            of `factor_right` (see there for the cost of factoring the content).
 
         Note: `prod_left` multiplies factors on the *left* (so the iterable order is reversed
             in the final product). We return factors in the order that `prod_left` expects.
@@ -1165,14 +1173,9 @@ class hurwitzint:
         Returns:
             tuple: The factors of self.
         """
-        f = self.factor_left_detail()
-        unit = f.unit
-        factors = f.primes
-        scaler = f.content
-
-        if factors:
-            first = factors[0] * unit * scaler
-            return first, *factors[1:]
+        f = self.factor_left_detail().expand_content()
+        if f.primes:
+            return f.primes[0] * f.unit, *f.primes[1:]
 
         return (self,)
     # endregion

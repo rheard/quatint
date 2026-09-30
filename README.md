@@ -27,8 +27,8 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
 New helper methods on every Hurwitz integer value:
 
 * `x.content()` — largest positive integer `n` such that `x = n*y` for another Hurwitz integer `y`.
-* `x.factor_right()` — a plain ordered tuple of factors whose product via `prod_right(...)` is exactly `x`.
-* `x.factor_left()` — a plain ordered tuple of factors whose product via `prod_left(...)` is exactly `x`.
+* `x.factor_right()` — a plain ordered tuple of Hurwitz primes whose product via `prod_right(...)` is exactly `x`.
+* `x.factor_left()` — a plain ordered tuple of Hurwitz primes whose product via `prod_left(...)` is exactly `x`.
 * `x.factor_right_detail()` — structured right factorization as a `NonCommutativeFactorization`.
 * `x.factor_left_detail()` — structured left factorization as a `NonCommutativeFactorization`.
 
@@ -137,15 +137,17 @@ By default the prime is canonical up to a unit on its left, like the primes of `
 
 `quatint` exposes two levels of factorization API:
 
-* `factor_right()` / `factor_left()` return a simple ordered tuple of factors.
+* `factor_right()` / `factor_left()` return a simple ordered tuple of Hurwitz primes.
 * `factor_right_detail()` / `factor_left_detail()` return a structured `NonCommutativeFactorization` with metadata.
 
-Use the plain methods when you just want factors that multiply back to the original value. 
+Use the plain methods when you just want primes that multiply back to the original value. 
   Use the detailed methods when you care about the separated integer content, unit, normalized prime factors, or canonical ordering.
 
 ### Plain factorization
 
-The flat factorization methods return a tuple of `hurwitzint` factors. Because multiplication is non-commutative, the order and direction matter.
+The flat factorization methods return a tuple of Hurwitz primes (each has a rational prime as its norm), with the unit folded into the first one.
+    That includes the primes of the integer content, factored as described under [Factoring the content](#factoring-the-content).
+    Because multiplication is non-commutative, the order and direction matter.
 
 ```python
 from quatint import hurwitzint, prod_left, prod_right
