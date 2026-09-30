@@ -172,6 +172,8 @@ assert g == a.gcd_left(b)
 assert a * s + b * t == g
 ```
 
+Like `gcd_left` and `gcd_right`, they also come as functions: `xgcd_left(a, b)` and `xgcd_right(a, b)`.
+
 ### Primes of a given norm
 
 Every rational prime `p` is the norm of a Hurwitz prime, and `hurwitzint.prime_of_norm(p)` returns a fixed one (always the same one for the same `p`).
@@ -302,7 +304,8 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `b.divides_right(a)` / `b.divides_left(a)` → whether `a == q*b` / `a == b*q` for some `q`
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
-* `a.xgcd_right(b)` / `a.xgcd_left(b)` → `(g, s, t)` with `s*a + t*b == g` / `a*s + b*t == g`
+* `a.xgcd_left(b)` / `xgcd_left(a, b)` → `(g, s, t)` with `a*s + b*t == g`
+* `a.xgcd_right(b)` / `xgcd_right(a, b)` → `(g, s, t)` with `s*a + t*b == g`
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`

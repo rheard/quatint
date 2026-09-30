@@ -18,7 +18,17 @@ from sympy import factorint, isprime
 
 import quatint.quat
 
-from quatint.quat import NonCommutativeFactorization, gcd_left, gcd_right, hurwitzint, prod_left, prod_right, rdivmod
+from quatint.quat import (
+    NonCommutativeFactorization,
+    gcd_left,
+    gcd_right,
+    hurwitzint,
+    prod_left,
+    prod_right,
+    rdivmod,
+    xgcd_left,
+    xgcd_right,
+)
 
 @pytest.mark.skipif(os.getenv("CI", "").lower() not in {"1", "true", "yes"},
                     reason="Compiled-only test")
@@ -1600,6 +1610,20 @@ class TestXgcd(HurwitzIntTests):
         for m in (2, -2, 82, 41.0, 6.9):
             assert a.xgcd_right(m) == a.xgcd_right(hurwitzint(m))
             assert a.xgcd_left(m) == a.xgcd_left(hurwitzint(m))
+
+    def test_module_level_helpers(self):
+        """The module-level xgcd_left and xgcd_right give the same results as the methods, and quatint exports them"""
+        pairs = (
+            (hurwitzint(2, 3, 4, 53), self.a_int),
+            (hurwitzint(3, 5, 7, 9, half=True) * self.a_int, self.a_int),
+            (hurwitzint(12), 18),
+        )
+        for a, b in pairs:
+            assert xgcd_left(a, b) == a.xgcd_left(b)
+            assert xgcd_right(a, b) == a.xgcd_right(b)
+
+        assert quatint.xgcd_left is xgcd_left
+        assert quatint.xgcd_right is xgcd_right
 
     def test_unsupported_types_raise_type_error(self):
         """An extended gcd with something that is not a number raises TypeError, on either side"""

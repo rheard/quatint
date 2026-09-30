@@ -1492,6 +1492,16 @@ def gcd_right(a: hurwitzint, b: OP_TYPES) -> hurwitzint:
     return a.gcd_right(b)
 
 
+def xgcd_left(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+    """Simply a helper method to match gcd_left, for a.xgcd_left(b)"""
+    return a.xgcd_left(b)
+
+
+def xgcd_right(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+    """Simply a helper method to match gcd_right, for a.xgcd_right(b)"""
+    return a.xgcd_right(b)
+
+
 def prod_right(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
     """Simply a helper method to match existing Python prod syntax"""
     if start is None:

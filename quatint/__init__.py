@@ -6,4 +6,6 @@ from quatint.quat import (
     prod_left as prod_left,
     prod_right as prod_right,
     rdivmod as rdivmod,
+    xgcd_left as xgcd_left,
+    xgcd_right as xgcd_right,
 )
