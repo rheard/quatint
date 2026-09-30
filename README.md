@@ -21,7 +21,8 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
 - **Euclidean division** (norm-Euclidean) via:
   - `divmod(a, b)` for **left-quotient** division (`a = q*b + r`)
   - `a.rdivmod(b)` (or `quatint.rdivmod(a, b)`) for **right-quotient** division (`a = b*q + r`)
-- **Exact division** (`exact_div_right`, `exact_div_left`), which gives `None` rather than leave a remainder
+- **Exact division** (`exact_div_right`, `exact_div_left`), which gives `None` rather than leave a remainder,
+  and **divisibility** tests (`divides_right`, `divides_left`)
 - **Left/right gcd** (`gcd_left`, `gcd_right`) built on the corresponding division
 - **Deterministic factorization** into `content`, `unit`, and Hurwitz primes (by prime norms)
 
@@ -93,7 +94,7 @@ q, r = rdivmod(a, b)
 assert b * q + r == a
 ```
 
-### Exact division
+### Exact division and divisibility
 
 `divmod` and `rdivmod` always find a quotient, and leave whatever remainder they have to.
     `exact_div_right` and `exact_div_left` only divide when nothing would be left over, and return `None` otherwise:
@@ -111,6 +112,20 @@ assert x.exact_div_left(y) is None                     # but no q gives x == y *
 Like `gcd_right` and `gcd_left`, they are named for the side of `x` that `y` divides:
     `x.exact_div_right(y)` is the exact version of `divmod(x, y)` (`x == q*y`),
     and `x.exact_div_left(y)` is the exact version of `rdivmod(x, y)` (`x == y*q`).
+
+To just ask whether `y` divides `x`, use `y.divides_right(x)` or `y.divides_left(x)` (`y` goes first, as in "`y` divides `x`").
+    Everything divides `0`, and `0` divides only `0`, so these never raise `ZeroDivisionError`:
+
+```python
+from quatint import hurwitzint
+
+y = hurwitzint(1, 1, 1, 0)      # 1+i+j
+x = hurwitzint(0, 1, 0, 0) * y  # i*y
+
+assert y.divides_right(x) and not y.divides_left(x)
+assert hurwitzint(1, 1, 0, 0).divides_left(2)  # 2 == (1+i) * (1-i)
+assert y.divides_right(0) and not hurwitzint(0).divides_right(x)
+```
 
 ### GCD (left and right)
 
@@ -263,6 +278,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `divmod(a, b)` → left-quotient Euclidean division
 * `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division
 * `a.exact_div_right(b)` / `a.exact_div_left(b)` → the `q` with `a == q*b` / `a == b*q`, or `None` if there is none
+* `b.divides_right(a)` / `b.divides_left(a)` → whether `a == q*b` / `a == b*q` for some `q`
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`

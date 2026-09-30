@@ -745,6 +745,58 @@ class hurwitzint:
             raise ZeroDivisionError
 
         return self._exact_division(other, n, right=True)
+
+    def divides_right(self, other: OP_TYPES) -> bool:
+        """
+        Return True iff self is a right divisor of other: other == q * self for some Hurwitz integer q.
+
+        That is, iff other.exact_div_right(self) finds a quotient. Note which way round that is: self is the
+            divisor, as in "self divides other". Everything divides 0, and 0 divides only 0, so unlike
+            exact_div_right this never raises ZeroDivisionError.
+
+        Returns:
+            bool: Whether self divides other on the right.
+
+        Raises:
+            TypeError: If other is an unsupported type.
+        """
+        if isinstance(other, _OTHER_OP_TYPES):
+            other = self._from_obj(other)
+
+        if not isinstance(other, hurwitzint):
+            raise TypeError(f"unsupported type for divides_right: {type(other).__name__!r}")
+
+        n = abs(self)
+        if n == 0:
+            return not other  # 0 only divides 0
+
+        return other._exact_division(self, n) is not None
+
+    def divides_left(self, other: OP_TYPES) -> bool:
+        """
+        Return True iff self is a left divisor of other: other == self * q for some Hurwitz integer q.
+
+        That is, iff other.exact_div_left(self) finds a quotient. Note which way round that is: self is the
+            divisor, as in "self divides other". Everything divides 0, and 0 divides only 0, so unlike
+            exact_div_left this never raises ZeroDivisionError.
+
+        Returns:
+            bool: Whether self divides other on the left.
+
+        Raises:
+            TypeError: If other is an unsupported type.
+        """
+        if isinstance(other, _OTHER_OP_TYPES):
+            other = self._from_obj(other)
+
+        if not isinstance(other, hurwitzint):
+            raise TypeError(f"unsupported type for divides_left: {type(other).__name__!r}")
+
+        n = abs(self)
+        if n == 0:
+            return not other  # 0 only divides 0
+
+        return other._exact_division(self, n, right=True) is not None
     # endregion
 
     def __abs__(self) -> int:

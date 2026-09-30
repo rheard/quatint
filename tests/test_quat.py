@@ -940,6 +940,109 @@ class TestExactDiv(HurwitzIntTests):
                     method(other)
 
 
+class TestDivides(HurwitzIntTests):
+    """Tests for divides_right and divides_left"""
+
+    def test_examples(self):
+        """Some divisors worked out by hand"""
+        # 1+i+j divides i*(1+i+j) on the right, but not on the left (see TestExactDiv.test_examples)
+        y = hurwitzint(1, 1, 1, 0)
+        x = hurwitzint(0, 1, 0, 0) * y
+        assert y.divides_right(x) is True
+        assert y.divides_left(x) is False
+
+        # 1+i divides 2 == (1-i) * (1+i) == (1+i) * (1-i) on both sides, but not 1, which would leave (1-i)/2
+        assert hurwitzint(1, 1, 0, 0).divides_right(2) is True
+        assert hurwitzint(1, 1, 0, 0).divides_left(2) is True
+        assert hurwitzint(1, 1, 0, 0).divides_right(1) is False
+        assert hurwitzint(1, 1, 0, 0).divides_left(1) is False
+
+        # A Hurwitz integer divides its norm on both sides, since N(y) == conj(y) * y == y * conj(y)
+        y = hurwitzint(3, -5, 7, 9, half=True)
+        assert y.divides_right(41) is True
+        assert y.divides_left(41) is True
+
+        # 2 divides 1+i+j+k == 2 * (1+i+j+k)/2, but not 1+i, which would leave the numerators 1, 1, 0, 0
+        assert hurwitzint(2).divides_right(hurwitzint(1, 1, 1, 1)) is True
+        assert hurwitzint(2).divides_left(hurwitzint(1, 1, 1, 1)) is True
+        assert hurwitzint(2).divides_right(hurwitzint(1, 1, 0, 0)) is False
+        assert hurwitzint(2).divides_left(hurwitzint(1, 1, 0, 0)) is False
+
+    def test_matches_exact_div(self):
+        """For every small pair, y divides x on a side exactly when x divides exactly by y on that side"""
+        for y in self.division_divisors:
+            for x in self.wide_search_values(2):
+                assert y.divides_right(x) is (x.exact_div_right(y) is not None)
+                assert y.divides_left(x) is (x.exact_div_left(y) is not None)
+
+    def test_multiples(self):
+        """
+        For random q and y of every size, y divides q*y on the right and y*q on the left. Adding 1 leaves neither
+            one a multiple of y, unless y is a unit (y*w == 1 + y*q would make 1 a multiple of y)
+        """
+        rng = random.Random(10_000)
+        for bound in (3, 10**4, 10**12, 10**30):
+            for _ in range(250):
+                q = self.rand_hurwitzint(rng, bound)
+                y = self.rand_hurwitzint(rng, bound)
+
+                assert y.divides_right(q * y) is True
+                assert y.divides_left(y * q) is True
+
+                if not y.is_unit:
+                    assert y.divides_right(q * y + 1) is False
+                    assert y.divides_left(y * q + 1) is False
+
+    def test_gcd_divides_both(self):
+        """A right gcd divides both its arguments on the right, and a left gcd divides both on the left"""
+        rng = random.Random(11_000)
+        for bound in (3, 10**4, 10**12):
+            for _ in range(100):
+                a = self.rand_hurwitzint(rng, bound)
+                b = self.rand_hurwitzint(rng, bound)
+
+                g = a.gcd_right(b)
+                assert g.divides_right(a) is True
+                assert g.divides_right(b) is True
+
+                g = a.gcd_left(b)
+                assert g.divides_left(a) is True
+                assert g.divides_left(b) is True
+
+    def test_units_divide_everything(self):
+        """Every unit divides everything, on either side"""
+        for u in hurwitzint.UNITS:
+            for x in self.division_divisors:
+                assert u.divides_right(x) is True
+                assert u.divides_left(x) is True
+
+    def test_zero(self):
+        """Everything divides 0, and 0 divides only 0, with no ZeroDivisionError either way"""
+        for y in (self.a_int, hurwitzint(1), hurwitzint(3, -5, 7, 9, half=True), hurwitzint(0)):
+            for zero in (hurwitzint(0), 0, 0.0):
+                assert y.divides_right(zero) is True
+                assert y.divides_left(zero) is True
+
+        for x in (self.a_int, hurwitzint(1), 5, -3.0):
+            assert hurwitzint(0).divides_right(x) is False
+            assert hurwitzint(0).divides_left(x) is False
+
+    def test_int_and_float_arguments(self):
+        """An int or float argument is divided like the hurwitzint it equals"""
+        for y in (hurwitzint(1, 1, 0, 0), hurwitzint(3), hurwitzint(3, -5, 7, 9, half=True)):
+            for m in (6, -6, 7, 41, 41.0, 6.5):
+                assert y.divides_right(m) is y.divides_right(hurwitzint(m))
+                assert y.divides_left(m) is y.divides_left(hurwitzint(m))
+
+    def test_unsupported_types_raise_type_error(self):
+        """Asking whether something that is not a number is divisible raises TypeError, on either side"""
+        y = self.a_int
+        for method in (y.divides_right, y.divides_left):
+            for other in ("a", None, [1]):
+                with pytest.raises(TypeError):
+                    method(other)
+
+
 class TestRoundDivTiesAwayFromZero:
     """Tests for _round_div_ties_away_from_zero, the rounding that every division starts from"""
 
