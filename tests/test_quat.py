@@ -1323,6 +1323,69 @@ class TestProd(HurwitzIntTests):
         assert prod_left((), start=self.a_int) == self.a_int
 
 
+class TestPrimeOfNorm(HurwitzIntTests):
+    """Tests for hurwitzint.prime_of_norm, a fixed Hurwitz prime for each rational prime norm"""
+
+    # Every prime below 2000, and a big one of each kind the square root search handles: p % 4 == 3, then p % 4 == 1
+    primes = (*(p for p in range(2000) if isprime(p)), 2**127 - 1, 10**40 + 121)
+
+    def test_norm_and_factors_of_p(self):
+        """The prime has norm p, so it and its conjugate multiply to p, in either order"""
+        assert isprime(10**40 + 121)
+        for p in self.primes:
+            for direction in ("right", "left"):
+                prime = hurwitzint.prime_of_norm(p, direction=direction)
+
+                assert abs(prime) == p
+                assert prime.conjugate() * prime == p
+                assert prime * prime.conjugate() == p
+
+    def test_canonical(self):
+        """Like the factorizations' primes, the right one is the largest of all u*P, and the left one of all P*u"""
+        for p in self.primes[:100]:
+            right = hurwitzint.prime_of_norm(p)
+            left = hurwitzint.prime_of_norm(p, direction="left")
+
+            assert all(tuple(u * right) <= tuple(right) for u in hurwitzint.UNITS)
+            assert all(tuple(left * u) <= tuple(left) for u in hurwitzint.UNITS)
+
+    def test_fixed_choices(self):
+        """The choice depends on nothing but p, so pin some of them"""
+        assert hurwitzint.prime_of_norm(2) == hurwitzint(1, 1, 0, 0)
+        assert hurwitzint.prime_of_norm(2, direction="left") == hurwitzint(1, 1, 0, 0)
+        assert hurwitzint.prime_of_norm(3) == hurwitzint(3, 1, -1, -1, half=True)
+        assert hurwitzint.prime_of_norm(3, direction="left") == hurwitzint(3, 1, -1, 1, half=True)
+        assert hurwitzint.prime_of_norm(5) == hurwitzint(2, 0, -1, 0)
+        assert hurwitzint.prime_of_norm(13) == hurwitzint(3, 0, 2, 0)
+
+    def test_uv_is_least(self):
+        """_uv_for_prime finds the least u, and then the least v, with 1 + u^2 + v^2 divisible by p (by brute force)"""
+        for p in (q for q in range(200) if isprime(q)):
+            least = next((u, v) for u in range(p) for v in range(p) if (1 + u * u + v * v) % p == 0)
+            assert quatint.quat._uv_for_prime(p) == least
+
+    def test_not_prime(self):
+        """Anything but a prime raises ValueError (a composite could leave the square root search looping forever)"""
+        for n in (-7, -2, 0, 1, 4, 9, 15, 21, 561, 2**127 + 1):
+            with pytest.raises(ValueError, match="not prime"):
+                hurwitzint.prime_of_norm(n)
+
+    def test_float_is_truncated(self):
+        """Like everywhere else a float meets a hurwitzint, it is truncated with int()"""
+        assert hurwitzint.prime_of_norm(5.0) == hurwitzint.prime_of_norm(5)
+        assert hurwitzint.prime_of_norm(5.9) == hurwitzint.prime_of_norm(5)
+        assert hurwitzint.prime_of_norm(3.5, direction="left") == hurwitzint.prime_of_norm(3, direction="left")
+
+    def test_unsupported_types_and_directions(self):
+        """A non-number raises TypeError in both builds, and an unknown direction raises ValueError"""
+        for bad in ("5", None, Fraction(5), hurwitzint(5)):
+            with pytest.raises(TypeError):
+                hurwitzint.prime_of_norm(bad)
+
+        with pytest.raises(ValueError, match="direction"):
+            hurwitzint.prime_of_norm(5, direction="up")
+
+
 class TestFactorRightDetail(HurwitzIntTests):
     """Tests for factor_right_detail"""
 

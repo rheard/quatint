@@ -116,6 +116,23 @@ from quatint import hurwitzint
 assert hurwitzint(-6).gcd_right(15) == 3
 ```
 
+### Primes of a given norm
+
+Every rational prime `p` is the norm of a Hurwitz prime, and `hurwitzint.prime_of_norm(p)` returns a fixed one (always the same one for the same `p`).
+    A quaternion times its conjugate is its norm, so this also splits `p` into two Hurwitz primes:
+
+```python
+from quatint import hurwitzint
+
+P = hurwitzint.prime_of_norm(5)
+print(P)  # (2+0i-j+0k)
+assert abs(P) == 5
+assert P.conjugate() * P == 5
+```
+
+By default the prime is canonical up to a unit on its left, like the primes of `factor_right_detail()`.
+    `direction="left"` gives one that is canonical up to a unit on its right, like those of `factor_left_detail()`.
+
 ### Factorization
 
 `quatint` exposes two levels of factorization API:
@@ -205,5 +222,6 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division
 * `a.gcd_left(b)` / `gcd_left(a, b)`
 * `a.gcd_right(b)` / `gcd_right(a, b)`
+* `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`

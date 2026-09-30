@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import gcd, prod
 from typing import ClassVar, Iterable, Iterator, Literal, Union
 
-from sympy import factorint
+from sympy import factorint, isprime
 
 OTHER_OP_TYPES = Union[int, float]
 _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
@@ -183,6 +183,39 @@ def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H
         Pa, Pb, Pc, Pd = _mul_numerators(Qa, Qb, Qc, Qd, E, F, G, H)
 
     return Qa, Qb, Qc, Qd, A - Pa, B - Pb, C - Pc, D - Pd
+
+
+def _uv_for_prime(p: int) -> tuple[int, int]:
+    """
+    Return the least u >= 0 for which -1 - u^2 is a square mod the prime p, and v, the least square root of it.
+
+    Then 1 + u^2 + v^2 == 0 (mod p). This only needs pow (no library call that could change between versions),
+        so the pair depends on nothing but p, and so does every prime built from it (see hurwitzint.prime_of_norm).
+
+    Returns:
+        tuple: (u, v).
+    """
+    if p == 2:
+        return 0, 1
+
+    if p % 4 == 1:
+        # -1 is a square, so u = 0, and z^((p-1)/4) is a square root of -1 for any non-residue z
+        z = 2
+        while pow(z, (p - 1) // 2, p) != p - 1:
+            z += 1
+
+        r = pow(z, (p - 1) // 4, p)
+        return 0, min(r, p - r)
+
+    # p % 4 == 3, so -1 is not a square, but -1 - u^2 is for about half of all u, and then t^((p+1)/4) is a root of t
+    u = 1
+    while True:
+        t = (-1 - u * u) % p
+        if pow(t, (p - 1) // 2, p) == 1:
+            r = pow(t, (p + 1) // 4, p)
+            return u, min(r, p - r)
+
+        u += 1
 
 
 class hurwitzint:
@@ -864,6 +897,53 @@ class hurwitzint:
 
         if abs(g) != p:
             raise ArithmeticError(f"Failed to extract left prime for {p=}")
+
+        return g
+
+    @classmethod
+    def prime_of_norm(cls, p: OTHER_OP_TYPES, *, direction: Literal["left", "right"] = "right") -> hurwitzint:
+        """
+        Return a fixed Hurwitz prime whose norm is the rational prime p.
+
+        Every rational prime is the norm of 24*(p + 1) Hurwitz integers (just 24 for p=2), so this picks one:
+            with u the least u >= 0 for which -1 - u^2 is a square mod p, and v the least square root of it,
+            p divides N(1 + u*i + v*j) = 1 + u^2 + v^2, and the canonical gcd of the two has norm p.
+            direction="right" takes gcd_right, canonical up to a unit on its left like the primes of
+            `factor_right_detail`, and direction="left" takes gcd_left, canonical up to a unit on its right like the
+            primes of `factor_left_detail`.
+
+        A quaternion times its conjugate is its norm, so this also factors p, as conj(P) * P (or P * conj(P)):
+
+            hurwitzint.prime_of_norm(2) == 1+i, and 2 == (1-i) * (1+i)
+            hurwitzint.prime_of_norm(5) == 2-j, and 5 == (2+j) * (2-j)
+
+        Floats are truncated with int(), like everywhere else a float meets a hurwitzint.
+
+        Returns:
+            hurwitzint: The prime.
+
+        Raises:
+            TypeError: If p is not an int or float.
+            ValueError: If p is not prime, or direction is not "left" or "right".
+            ArithmeticError: If the gcd does not have norm p, indicating a bug in the code.
+        """
+        # The mypyc build rejects anything else before getting here, so this makes pure Python match it
+        if not isinstance(p, _OTHER_OP_TYPES):
+            raise TypeError(f"unsupported type for prime_of_norm: {type(p).__name__!r}")
+
+        if direction not in ("left", "right"):
+            raise ValueError(f"direction must be 'left' or 'right', not {direction!r}")
+
+        # isprime also keeps composites away from _uv_for_prime, whose square root search might never end for one
+        n = p if type(p) is int else int(p)
+        if not isprime(n):
+            raise ValueError(f"{n} is not prime")
+
+        u, v = _uv_for_prime(n)
+        seed = cls(1, u, v, 0)
+        g = seed.gcd_right(n) if direction == "right" else seed.gcd_left(n)
+        if abs(g) != n:
+            raise ArithmeticError(f"Failed to find a prime of norm {n}")
 
         return g
 
