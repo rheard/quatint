@@ -344,6 +344,15 @@ class TestComponents(HurwitzIntTests):
             with pytest.raises(IndexError):
                 operator.getitem(x, idx)
 
+    def test_index_types(self):
+        """Only an int indexes a hurwitzint: anything else, a slice included, raises TypeError in both builds"""
+        x = hurwitzint(1, 2, 3, 4)
+        for idx in (slice(1, None), slice(None), 1.0, "1", None):
+            with pytest.raises(TypeError):
+                operator.getitem(x, idx)
+
+        assert x[True] == x[1]  # A bool is an int, as with a tuple
+
     def test_den_and_is_lipschitz(self):
         """Every part is over den == 2, and is_lipschitz is whether they all come out whole"""
         for x in (hurwitzint(1, -2, 3, 0), hurwitzint(0), hurwitzint(3, -5, 7, 9, half=True)):

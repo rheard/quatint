@@ -885,6 +885,11 @@ class hurwitzint:
         return 4
 
     def __getitem__(self, idx: int) -> int:
+        # The mypyc build rejects anything but an int before getting here (a slice too), so this makes pure Python
+        #   match it, rather than answer x[1.0] with the i part, or call a slice out of range
+        if not isinstance(idx, int):
+            raise TypeError(f"hurwitzint indices must be integers, not {type(idx).__name__}")
+
         if idx == 0:
             return self._a
         if idx == 1:
