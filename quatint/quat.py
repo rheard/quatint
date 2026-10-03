@@ -922,7 +922,8 @@ class hurwitzint:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, hurwitzint):
-            return (self._a, self._b, self._c, self._d) == (other._a, other._b, other._c, other._d)
+            # Part by part, since mypyc compiles a tuple comparison into a slow generic one
+            return self._a == other._a and self._b == other._b and self._c == other._c and self._d == other._d
 
         # Python numbers compare exactly (unlike arithmetic, which truncates floats with int()), since anything equal
         #   has to hash the same too (see __hash__). A complex off the real axis is never equal.
