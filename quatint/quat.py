@@ -445,10 +445,13 @@ class hurwitzint:
         return self._d
 
     # region constructors / conversions
-    @classmethod
-    def _make(cls, A: int, B: int, C: int, D: int) -> hurwitzint:
-        """Construct a new value of *this* conceptual type from internal numerators A,B,C,D."""
-        return cls(A, B, C, D, half=True)
+    @staticmethod
+    def _make(A: int, B: int, C: int, D: int) -> hurwitzint:
+        """Construct a hurwitzint from its numerators, as every arithmetic result is."""
+        # By the class's own name, mypyc calls the native constructor directly. Through cls it was a generic Python
+        #   call, which parsed the arguments (matching half up by name) before getting there, and that was about half
+        #   of what a + b cost. A compiled hurwitzint can't be subclassed anyway.
+        return hurwitzint(A, B, C, D, half=True)
 
     @classmethod
     def _from_obj(cls, n: OP_TYPES) -> hurwitzint:
