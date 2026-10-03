@@ -258,7 +258,7 @@ class TestInit(HurwitzIntTests):
 
 
 class TestImmutable(HurwitzIntTests):
-    """Tests that a hurwitzint cannot be changed once it is made"""
+    """Tests that a hurwitzint (or a factorization) cannot be changed once it is made"""
 
     def test_components_are_read_only(self):
         """Setting or deleting a, b, c or d raises AttributeError, and leaves the value (and its hash) alone"""
@@ -274,6 +274,22 @@ class TestImmutable(HurwitzIntTests):
 
         assert list(x) == [2, 4, 6, 8]
         assert values[hurwitzint(1, 2, 3, 4)] == "x"
+
+    def test_factorization_is_frozen(self):
+        """A factorization's fields are read-only too, and it has no __dict__ to take new ones"""
+        factors = hurwitzint(2, 3, 4, 53).factor_right_detail()
+
+        # Only the fields, since a name that isn't one raises TypeError instead in pure Python before 3.14
+        #   (a CPython bug in the __setattr__ of a frozen dataclass with slots)
+        for name in ("content", "unit", "primes", "direction"):
+            with pytest.raises(AttributeError):  # FrozenInstanceError is an AttributeError
+                setattr(factors, name, 1)
+
+            with pytest.raises(AttributeError):
+                delattr(factors, name)
+
+        assert not hasattr(factors, "__dict__")
+        assert factors == hurwitzint(2, 3, 4, 53).factor_right_detail()
 
 
 class TestPickle(HurwitzIntTests):

@@ -12,9 +12,7 @@ _OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
 
 
-# TODO: Once Py3.9 support has been dropped, add slots=True
-# @dataclass(frozen=True, slots=True)
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NonCommutativeFactorization:
     """
     Normal form of a factorization into Hurwitz primes:
