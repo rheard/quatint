@@ -504,6 +504,28 @@ class TestMul(HurwitzIntTests):
             self.assert_equal((2 * i, 4 * i, 6 * i, 8 * i), res_int)
 
 
+class TestScalarOperands(HurwitzIntTests):
+    """Tests for +, - and * with an int or float on either side"""
+
+    def test_matches_hurwitzint(self):
+        """
+        A number on either side of +, - or * gives exactly what the hurwitzint it truncates to gives,
+            for negative, big and fractional numbers and bools, with Lipschitz and half-integer values
+        """
+        numbers = (0, 1, -1, 7, -12, 2**30, -(2**31) - 5, 2**62 + 3, -(10**30) - 7, True, False,
+                   2.9, -2.9, 0.5, -0.0, 1e20)
+        values = (hurwitzint(1, -2, 3, 0), hurwitzint(3, -5, 7, 9, half=True), hurwitzint(0),
+                  hurwitzint(-(10**20), 1, -1, 3), hurwitzint(2**31 + 1, -(2**31) - 3, 5, -7, half=True))
+        for x in values:
+            for n in numbers:
+                h = hurwitzint(n)
+                for result, expected in ((x + n, x + h), (n + x, h + x), (x - n, x - h), (n - x, h - x),
+                                         (x * n, x * h), (n * x, h * x)):
+                    assert result == expected
+                    assert type(result) is hurwitzint
+                    assert all(type(part) is int for part in result)
+
+
 class TestUnsupportedOperands(HurwitzIntTests):
     """Tests for +, - and * with operand types hurwitzint does not support"""
 

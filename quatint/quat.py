@@ -481,11 +481,16 @@ class hurwitzint:
         return self._make(self._a, -self._b, -self._c, -self._d)
 
     def __add__(self, other: OP_TYPES) -> hurwitzint:
-        if isinstance(other, _OTHER_OP_TYPES):
-            other = self._from_obj(other)
-
+        # A hurwitzint is checked for first: under mypyc that is a pointer compare, while the check for a number is a
+        #   generic isinstance against a tuple, which took about a third of a + b
         if isinstance(other, hurwitzint):
             return self._make(self._a + other._a, self._b + other._b, self._c + other._c, self._d + other._d)
+
+        if isinstance(other, _OTHER_OP_TYPES):
+            # A number only moves the real part, whose numerator is twice the number: n + n, since mypyc's int multiply
+            #   leaves its fast path for a negative n (see _mul)
+            n = other if type(other) is int else int(other)
+            return self._make(self._a + n + n, self._b, self._c, self._d)
 
         return NotImplemented
 
@@ -493,16 +498,22 @@ class hurwitzint:
         return self.__add__(other)
 
     def __sub__(self, other: OP_TYPES) -> hurwitzint:
-        if isinstance(other, _OTHER_OP_TYPES):
-            other = self._from_obj(other)
-
         if isinstance(other, hurwitzint):
             return self._make(self._a - other._a, self._b - other._b, self._c - other._c, self._d - other._d)
+
+        if isinstance(other, _OTHER_OP_TYPES):
+            n = other if type(other) is int else int(other)
+            return self._make(self._a - n - n, self._b, self._c, self._d)
 
         return NotImplemented
 
     def __rsub__(self, other: OTHER_OP_TYPES) -> hurwitzint:
-        return self.__neg__().__add__(other)
+        # other - self, without making -self first
+        if isinstance(other, _OTHER_OP_TYPES):
+            n = other if type(other) is int else int(other)
+            return self._make(n + n - self._a, -self._b, -self._c, -self._d)
+
+        return NotImplemented
 
     def __neg__(self) -> hurwitzint:
         return self._make(-self._a, -self._b, -self._c, -self._d)
@@ -511,30 +522,32 @@ class hurwitzint:
         return self._make(self._a, self._b, self._c, self._d)
 
     def __mul__(self, other: OP_TYPES) -> hurwitzint:
+        if isinstance(other, hurwitzint):
+            # Quaternion multiplication in numerator units.
+            # If q=(A+Bi+Cj+Dk)/2 and r=(E+Fi+Gj+Hk)/2,
+            # then qr has denominator 4; we store with denominator 2,
+            # so we must divide resulting numerators by 2.
+            A, B, C, D = self._a, self._b, self._c, self._d
+            E, F, G, H = other._a, other._b, other._c, other._d
+
+            # (a,b,c,d)*(e,f,g,h) with i^2=j^2=k^2=ijk=-1:
+            P = _mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)
+            Q = _mul(A, F) + _mul(B, E) + _mul(C, H) - _mul(D, G)
+            R = _mul(A, G) - _mul(B, H) + _mul(C, E) + _mul(D, F)
+            S = _mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)
+
+            # Must be divisible by 2 to land back in the Hurwitz order.
+            if (P & 1) or (Q & 1) or (R & 1) or (S & 1):
+                raise ArithmeticError("Non-integral product; parity constraint violated")
+
+            return self._make(P // 2, Q // 2, R // 2, S // 2)
+
         if isinstance(other, _OTHER_OP_TYPES):
-            other = self._from_obj(other)
+            # A number scales every part: 4 products, rather than a quaternion product's 16
+            n = other if type(other) is int else int(other)
+            return self._make(_mul(self._a, n), _mul(self._b, n), _mul(self._c, n), _mul(self._d, n))
 
-        if not isinstance(other, hurwitzint):
-            return NotImplemented
-
-        # Quaternion multiplication in numerator units.
-        # If q=(A+Bi+Cj+Dk)/2 and r=(E+Fi+Gj+Hk)/2,
-        # then qr has denominator 4; we store with denominator 2,
-        # so we must divide resulting numerators by 2.
-        A, B, C, D = self._a, self._b, self._c, self._d
-        E, F, G, H = other._a, other._b, other._c, other._d
-
-        # (a,b,c,d)*(e,f,g,h) with i^2=j^2=k^2=ijk=-1:
-        P = _mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)
-        Q = _mul(A, F) + _mul(B, E) + _mul(C, H) - _mul(D, G)
-        R = _mul(A, G) - _mul(B, H) + _mul(C, E) + _mul(D, F)
-        S = _mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)
-
-        # Must be divisible by 2 to land back in the Hurwitz order.
-        if (P & 1) or (Q & 1) or (R & 1) or (S & 1):
-            raise ArithmeticError("Non-integral product; parity constraint violated")
-
-        return self._make(P // 2, Q // 2, R // 2, S // 2)
+        return NotImplemented
 
     def __rmul__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         return self.__mul__(other)
