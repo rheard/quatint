@@ -334,13 +334,14 @@ class TestComponents(HurwitzIntTests):
             assert len(x) == 4
             assert list(x) == numerators
             assert [x[0], x[1], x[2], x[3]] == numerators
+            assert [x[-4], x[-3], x[-2], x[-1]] == numerators  # Counting back from the end, as with a tuple
             assert [x.a, x.b, x.c, x.d] == numerators
             assert hurwitzint(*x, half=True) == x
 
     def test_index_out_of_range(self):
-        """Indexing past the four parts raises IndexError"""
+        """Indexing past the four parts, from either end, raises IndexError"""
         x = hurwitzint(1, 2, 3, 4)
-        for idx in (4, 5, 100):
+        for idx in (4, 5, 100, -5, -6, -100):
             with pytest.raises(IndexError):
                 operator.getitem(x, idx)
 

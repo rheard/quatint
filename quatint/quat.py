@@ -890,6 +890,10 @@ class hurwitzint:
         if not isinstance(idx, int):
             raise TypeError(f"hurwitzint indices must be integers, not {type(idx).__name__}")
 
+        # A negative index counts back from the end, as with a tuple
+        if idx < 0:
+            idx += 4
+
         if idx == 0:
             return self._a
         if idx == 1:
@@ -898,7 +902,7 @@ class hurwitzint:
             return self._c
         if idx == 3:
             return self._d
-        raise IndexError("hurwitzint index out of range (valid: 0..3)")
+        raise IndexError("hurwitzint index out of range (valid: -4..3)")
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, hurwitzint):
