@@ -188,10 +188,11 @@ def _nearest_with_parity(U: int, Q0: int, parity: int, n: int) -> tuple[int, int
 
 def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int) -> tuple[int, int, int, int]:
     """
-    Multiply two Hurwitz integers given as numerators, (A+Bi+Cj+Dk)/2 * (E+Fi+Gj+Hk)/2, like hurwitzint.__mul__.
+    Multiply two Hurwitz integers given as numerators, (A+Bi+Cj+Dk)/2 * (E+Fi+Gj+Hk)/2.
 
-    Working on plain ints means no hurwitzint gets built (or parity-checked) for an intermediate product.
-        The product of two Hurwitz integers is one too, so each numerator over 4 is even and halves exactly.
+    hurwitzint.__mul__ is just this. The division code calls it directly, so it builds no hurwitzint (or parity check)
+        for an intermediate product. The product of two Hurwitz integers is one too, so each numerator over 4 is even
+        and halves exactly.
 
     Returns:
         tuple: The product's numerators, over 2.
@@ -523,24 +524,8 @@ class hurwitzint:
 
     def __mul__(self, other: OP_TYPES) -> hurwitzint:
         if isinstance(other, hurwitzint):
-            # Quaternion multiplication in numerator units.
-            # If q=(A+Bi+Cj+Dk)/2 and r=(E+Fi+Gj+Hk)/2,
-            # then qr has denominator 4; we store with denominator 2,
-            # so we must divide resulting numerators by 2.
-            A, B, C, D = self._a, self._b, self._c, self._d
-            E, F, G, H = other._a, other._b, other._c, other._d
-
-            # (a,b,c,d)*(e,f,g,h) with i^2=j^2=k^2=ijk=-1:
-            P = _mul(A, E) - _mul(B, F) - _mul(C, G) - _mul(D, H)
-            Q = _mul(A, F) + _mul(B, E) + _mul(C, H) - _mul(D, G)
-            R = _mul(A, G) - _mul(B, H) + _mul(C, E) + _mul(D, F)
-            S = _mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)
-
-            # Must be divisible by 2 to land back in the Hurwitz order.
-            if (P & 1) or (Q & 1) or (R & 1) or (S & 1):
-                raise ArithmeticError("Non-integral product; parity constraint violated")
-
-            return self._make(P // 2, Q // 2, R // 2, S // 2)
+            P, Q, R, S = _mul_numerators(self._a, self._b, self._c, self._d, other._a, other._b, other._c, other._d)
+            return self._make(P, Q, R, S)
 
         if isinstance(other, _OTHER_OP_TYPES):
             # A number scales every part: 4 products, rather than a quaternion product's 16
