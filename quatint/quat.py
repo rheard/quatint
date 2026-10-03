@@ -108,6 +108,10 @@ class NonCommutativeFactorization:
         unit = self.unit * carry if right else carry * self.unit
         return NonCommutativeFactorization(content=1, unit=unit, primes=tuple(primes), direction=self.direction)
 
+    def __reduce__(self) -> tuple:
+        # mypyc's default pickling would set the fields one at a time, which a frozen dataclass refuses
+        return NonCommutativeFactorization, (self.content, self.unit, self.primes, self.direction)
+
     def prod(self):
         """Recreate the number using prod_right or prod_left"""
         if self.direction == "right":

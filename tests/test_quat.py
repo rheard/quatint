@@ -295,6 +295,18 @@ class TestPickle(HurwitzIntTests):
                 assert y == x
                 assert hash(y) == hash(x)
 
+    def test_factorization(self):
+        """A factorization comes back equal (content, unit, primes and direction), from every protocol and copy"""
+        n = 30 * hurwitzint(3, 5, 7, 9, half=True)
+        cases = ((n, n.factor_right_detail()), (n, n.factor_left_detail()),
+                 (n, n.factor_left_detail().expand_content()), (hurwitzint(0), hurwitzint(0).factor_right_detail()))
+        for value, factors in cases:
+            for copied in self.round_trips(factors):
+                assert type(copied) is NonCommutativeFactorization
+                assert copied == factors
+                assert hash(copied) == hash(factors)
+                assert copied.prod() == value
+
 
 class TestComponents(HurwitzIntTests):
     """Tests for reading a hurwitzint's parts: a, b, c and d, len, iteration, indexing, den and is_lipschitz"""
