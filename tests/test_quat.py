@@ -275,12 +275,25 @@ class TestImmutable(HurwitzIntTests):
         assert list(x) == [2, 4, 6, 8]
         assert values[hurwitzint(1, 2, 3, 4)] == "x"
 
-    def test_copy_and_pickle(self):
-        """Copies and pickled round trips are still equal to the original"""
-        for x in (hurwitzint(1, 2, 3, 4), hurwitzint(3, -5, 7, 9, half=True)):
-            assert copy.copy(x) == x
-            assert copy.deepcopy(x) == x
-            assert pickle.loads(pickle.dumps(x)) == x
+
+class TestPickle(HurwitzIntTests):
+    """Tests for pickling and copying, which is what multiprocessing (and copy.deepcopy) rely on"""
+
+    @staticmethod
+    def round_trips(obj: object) -> list:
+        """Return obj after a pickle round trip at every protocol, a deepcopy, and a shallow copy"""
+        out = [pickle.loads(pickle.dumps(obj, protocol)) for protocol in range(pickle.HIGHEST_PROTOCOL + 1)]
+        out.extend((copy.deepcopy(obj), copy.copy(obj)))
+        return out
+
+    def test_hurwitzint(self):
+        """A hurwitzint comes back equal, and hashing the same, from every pickle protocol and through copy"""
+        for x in (hurwitzint(1, 2, 3, 4), hurwitzint(3, -5, 7, 9, half=True), hurwitzint(0), hurwitzint(-7),
+                  hurwitzint(10**30, -1, 0, 2**70)):
+            for y in self.round_trips(x):
+                assert type(y) is hurwitzint
+                assert y == x
+                assert hash(y) == hash(x)
 
 
 class TestComponents(HurwitzIntTests):
