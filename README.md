@@ -291,6 +291,8 @@ This means:
 
 `int` and `float` inputs are accepted as scalars and converted via `int(...)` (i.e., truncation semantics), both as operands and as the components (and exponents) given to `hurwitzint(...)` and `**`. Quaternion values themselves remain exact.
 
+That includes either argument of the module-level `rdivmod`, `gcd_left`, `gcd_right`, `xgcd_left` and `xgcd_right`, so `gcd_right(12, b)` is `hurwitzint(12).gcd_right(b)`.
+
 Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2) == 2.0` are `True`, but `hurwitzint(2) == 2.5` is `False`. A value that equals a Python number also hashes like it, so `hurwitzint(2)` and `2` are the same dict key (as `2` and `2.0` are).
 
 ## Public API (high level)

@@ -1511,29 +1511,49 @@ if not hurwitzint.UNITS:
     hurwitzint.UNITS = units()
 
 
-def rdivmod(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
-    """Simply a helper method to match existing Python divmod syntax"""
-    return a.rdivmod(b)
+def _to_hurwitzint(n: OP_TYPES, name: str) -> hurwitzint:
+    """
+    Return n as a hurwitzint, so the module-level helpers below take a plain number first too, like gcd_right(12, b).
+
+    Returns:
+        hurwitzint: n itself, or the hurwitzint equal to it (a float is truncated with int(), like everywhere else).
+
+    Raises:
+        TypeError: If n is not a hurwitzint, int or float.
+    """
+    if isinstance(n, hurwitzint):
+        return n
+
+    # The mypyc build rejects anything else before getting here, so this makes pure Python match it
+    if not isinstance(n, _OTHER_OP_TYPES):
+        raise TypeError(f"unsupported type for {name}: {type(n).__name__!r}")
+
+    return hurwitzint(n)
 
 
-def gcd_left(a: hurwitzint, b: OP_TYPES) -> hurwitzint:
-    """Simply a helper method to match existing Python gcd syntax"""
-    return a.gcd_left(b)
+def rdivmod(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+    """Simply a helper method to match existing Python divmod syntax, for a.rdivmod(b), where a can be a number too"""
+    return _to_hurwitzint(a, "rdivmod").rdivmod(b)
 
 
-def gcd_right(a: hurwitzint, b: OP_TYPES) -> hurwitzint:
-    """Simply a helper method to match existing Python gcd syntax"""
-    return a.gcd_right(b)
+def gcd_left(a: OP_TYPES, b: OP_TYPES) -> hurwitzint:
+    """Simply a helper method to match existing Python gcd syntax, for a.gcd_left(b), where a can be a number too"""
+    return _to_hurwitzint(a, "gcd_left").gcd_left(b)
 
 
-def xgcd_left(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
-    """Simply a helper method to match gcd_left, for a.xgcd_left(b)"""
-    return a.xgcd_left(b)
+def gcd_right(a: OP_TYPES, b: OP_TYPES) -> hurwitzint:
+    """Simply a helper method to match existing Python gcd syntax, for a.gcd_right(b), where a can be a number too"""
+    return _to_hurwitzint(a, "gcd_right").gcd_right(b)
 
 
-def xgcd_right(a: hurwitzint, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
-    """Simply a helper method to match gcd_right, for a.xgcd_right(b)"""
-    return a.xgcd_right(b)
+def xgcd_left(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+    """Simply a helper method to match gcd_left, for a.xgcd_left(b), where a can be a number too"""
+    return _to_hurwitzint(a, "xgcd_left").xgcd_left(b)
+
+
+def xgcd_right(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+    """Simply a helper method to match gcd_right, for a.xgcd_right(b), where a can be a number too"""
+    return _to_hurwitzint(a, "xgcd_right").xgcd_right(b)
 
 
 def prod_right(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):

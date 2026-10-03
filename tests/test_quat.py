@@ -1675,6 +1675,37 @@ class TestXgcd(HurwitzIntTests):
                     method(other)
 
 
+class TestModuleLevelHelpers(HurwitzIntTests):
+    """Tests for the module-level rdivmod, gcd_left, gcd_right, xgcd_left and xgcd_right with a plain number first"""
+
+    helpers = (rdivmod, gcd_left, gcd_right, xgcd_left, xgcd_right)
+
+    def test_examples(self):
+        """Two plain integers give their usual gcd, and a number divides like the hurwitzint it equals"""
+        assert gcd_right(12, 18) == gcd_left(-12, 18.0) == 6
+
+        for g, s, t in (xgcd_right(240, 46), xgcd_left(240, 46)):
+            assert g == 2
+            assert s * 240 + t * 46 == 2
+
+        # 30 is the norm of 1+2i+3j+4k, so it is (1+2i+3j+4k) times its conjugate
+        assert rdivmod(30, hurwitzint(1, 2, 3, 4)) == (hurwitzint(1, -2, -3, -4), 0)
+
+    def test_number_first(self):
+        """An int or float first works like the hurwitzint it equals, whatever comes second"""
+        for helper in self.helpers:
+            for a in (12, -7, 0, 6.9, -2.0):
+                for b in (hurwitzint(1, 1, 0, 0), hurwitzint(3, -5, 7, 9, half=True), 18, 4.5):
+                    assert helper(a, b) == helper(hurwitzint(a), b)
+
+    def test_unsupported_first_argument(self):
+        """Anything else first raises TypeError, in both builds"""
+        for helper in self.helpers:
+            for a in ("a", None, [1], complex(1, 2)):
+                with pytest.raises(TypeError):
+                    helper(a, hurwitzint(1, 2, 3, 4))
+
+
 class TestContent(HurwitzIntTests):
     """Tests for content, the largest integer that divides a Hurwitz integer"""
 
