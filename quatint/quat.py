@@ -1367,8 +1367,6 @@ class hurwitzint:
 
         # Extract integer content
         m = self.content()
-        if m < 0:
-            m = -m
 
         q = self
         if m > 1:
@@ -1439,8 +1437,6 @@ class hurwitzint:
             return NonCommutativeFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction="left")
 
         m = self.content()
-        if m < 0:
-            m = -m
 
         q = self
         if m > 1:
