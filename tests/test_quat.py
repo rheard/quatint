@@ -2327,7 +2327,7 @@ class TestFactorintTypes(HurwitzIntTests):
         monkeypatch.setattr(quatint.quat, "factorint", lambda n: {NotInt(p): NotInt(e) for p, e in real(n).items()})
         assert all(type(p) is NotInt for p in quatint.quat.factorint(30))
 
-        for n, answers in zip(values, expected):  # ruff: ignore[zip-without-explicit-strict]
+        for n, answers in zip(values, expected, strict=True):
             assert (n.factor_right_detail(), n.factor_left_detail(), n.factor_right(), n.factor_left()) == answers
 
 
