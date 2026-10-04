@@ -568,18 +568,6 @@ class hurwitzint:
         #   call, which parsed the arguments (matching half up by name) before getting there, and that was about half
         #   of what a + b cost. A compiled hurwitzint can't be subclassed anyway.
         return hurwitzint(A, B, C, D, half=True)
-
-    @classmethod
-    def _from_obj(cls, n: hurwitzint | int | float) -> hurwitzint:
-        """Convert a random object to a hurwitzint"""
-        if _is_number(n):
-            # scalar n -> (2n + 0i + 0j + 0k)/2
-            return cls._make(2 * int(n), 0, 0, 0)
-
-        if isinstance(n, hurwitzint):
-            return n
-
-        return NotImplemented
     # endregion
 
     @property
@@ -753,7 +741,7 @@ class hurwitzint:
             ZeroDivisionError: if other == 0
         """
         if _is_number(other):
-            other = self._from_obj(other)
+            other = hurwitzint(other)
 
         if not isinstance(other, hurwitzint):
             return NotImplemented
@@ -767,8 +755,7 @@ class hurwitzint:
 
     def __rdivmod__(self, other: int | float) -> tuple[hurwitzint, hurwitzint]:
         if _is_number(other):
-            new_other = self._from_obj(other)
-            return new_other.__divmod__(self)
+            return hurwitzint(other).__divmod__(self)
 
         return NotImplemented
 
@@ -778,8 +765,7 @@ class hurwitzint:
 
     def __rtruediv__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
-            new_other = self._from_obj(other)
-            return new_other.__truediv__(self)
+            return hurwitzint(other).__truediv__(self)
 
         return NotImplemented
 
@@ -793,8 +779,7 @@ class hurwitzint:
 
     def __rfloordiv__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
-            new_other = self._from_obj(other)
-            return new_other.__floordiv__(self)
+            return hurwitzint(other).__floordiv__(self)
 
         return NotImplemented
 
@@ -807,8 +792,7 @@ class hurwitzint:
 
     def __rmod__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
-            new_other = self._from_obj(other)
-            return new_other.__mod__(self)
+            return hurwitzint(other).__mod__(self)
 
         return NotImplemented
     # endregion
@@ -833,7 +817,7 @@ class hurwitzint:
             ZeroDivisionError: If trying to divide by 0.
         """
         if _is_number(other):
-            other = self._from_obj(other)
+            other = hurwitzint(other)
 
         if not isinstance(other, hurwitzint):
             raise TypeError(f"unsupported type for rdivmod: {type(other).__name__!r}")
@@ -1211,7 +1195,7 @@ class hurwitzint:
             TypeError: If other is an unsupported type.
         """
         if _is_number(other):
-            other = self._from_obj(other)
+            other = hurwitzint(other)
 
         if not isinstance(other, hurwitzint):
             raise TypeError(f"Unable to divide hurwitzint and type {type(other)}")
@@ -1250,7 +1234,7 @@ class hurwitzint:
             TypeError: If other is an unsupported type.
         """
         if _is_number(other):
-            other = self._from_obj(other)
+            other = hurwitzint(other)
 
         if not isinstance(other, hurwitzint):
             raise TypeError(f"unsupported type for xgcd: {type(other).__name__!r}")
