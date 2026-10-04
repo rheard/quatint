@@ -1220,6 +1220,46 @@ class TestIsUnit(HurwitzIntTests):
                 assert u * v in units
 
 
+class TestIsIrreducible(HurwitzIntTests):
+    """Tests for is_irreducible, which is whether the norm is a rational prime"""
+
+    def test_examples(self):
+        """Some values worked out by hand"""
+        assert not hurwitzint(0).is_irreducible
+        for unit in hurwitzint.UNITS:
+            assert not unit.is_irreducible
+
+        # Norms 2, 3, 3, 7 and 41
+        for x in (hurwitzint(1, 1, 0, 0), hurwitzint(1, 1, 1, 0), hurwitzint(3, 1, 1, 1, half=True),
+                  hurwitzint(2, 1, 1, 1), hurwitzint(3, -5, 7, 9, half=True)):
+            assert x.is_irreducible
+
+        # A rational prime p is conj(P) * P for a Hurwitz prime P of norm p, and 1+2i+3j+4k has norm 30
+        for x in (hurwitzint(2), hurwitzint(-3), hurwitzint(7), hurwitzint(1, 2, 3, 4)):
+            assert not x.is_irreducible
+
+    def test_matches_factorization(self):
+        """Exactly the values whose factorization is a single Hurwitz prime are irreducible"""
+        for x in self.wide_search_values():
+            factors = x.factor_right()
+            assert x.is_irreducible is (len(factors) == 1 and abs(x) > 1)
+
+    def test_associates_and_products(self):
+        """A unit on either side keeps a prime irreducible, and a product of two non-units is never irreducible"""
+        rng = random.Random(15_000)
+        for p in (2, 3, 5, 13, 10**9 + 7):
+            prime = hurwitzint.prime_of_norm(p)
+            for u in rng.sample(hurwitzint.UNITS, 6):
+                assert (u * prime).is_irreducible
+                assert (prime * u).is_irreducible
+
+        for bound in (3, 10**6):
+            for _ in range(50):
+                a, b = self.rand_hurwitzint(rng, bound), self.rand_hurwitzint(rng, bound)
+                if not a.is_unit and not b.is_unit:
+                    assert not (a * b).is_irreducible
+
+
 class TestInverse(HurwitzIntTests):
     """Tests for inverse"""
 

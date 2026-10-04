@@ -961,6 +961,20 @@ class hurwitzint:
         """Is this a unit Hurwitz integer?"""
         return abs(self) == 1
 
+    @property
+    def is_irreducible(self) -> bool:
+        """
+        Is this irreducible, a Hurwitz prime? That is, not 0 or a unit, and not a product of two non-units.
+
+        That is exactly when its norm is a rational prime. Then in any product x = a*b, N(a)*N(b) is prime, so a or b
+            has norm 1 and is a unit. Otherwise x is 0, a unit, or a product of Hurwitz primes, at least two of them
+            (see factor_right). So a rational prime p is never irreducible here, being conj(P) * P for a P of norm p.
+
+        Returns:
+            bool: Whether self is irreducible.
+        """
+        return isprime(abs(self))
+
     def inverse(self) -> hurwitzint:
         """Find the inverse of the current hurwitzint (only applies to units)"""
         if not self.is_unit:
