@@ -1242,6 +1242,19 @@ class TestInverse(HurwitzIntTests):
             with pytest.raises(ValueError, match="only Hurwitz units have inverses"):
                 n.inverse()
 
+    def test_invert_operator(self):
+        """~u is the inverse of a unit, the same as u.inverse(), and ~ raises ValueError for anything else"""
+        one = hurwitzint(1)
+        for unit in hurwitzint.UNITS:
+            inv = ~unit
+            assert inv == unit.inverse()
+            assert unit * inv == inv * unit == one
+            assert ~inv == unit
+
+        for n in (hurwitzint(0), hurwitzint(2), hurwitzint(1, 1, 0, 0), hurwitzint(3, 5, 7, 9, half=True)):
+            with pytest.raises(ValueError, match="only Hurwitz units have inverses"):
+                operator.invert(n)
+
     def test_negative_power_for_units_if_supported(self):
         """Validate negative powers of units agree with inverse powers."""
         i = hurwitzint(0, 1, 0, 0)

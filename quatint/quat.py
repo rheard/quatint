@@ -963,6 +963,10 @@ class hurwitzint:
 
         return self.conjugate()
 
+    def __invert__(self) -> hurwitzint:
+        """~u is the inverse of a unit u, like u.inverse(): its conjugate. Anything else raises ValueError."""
+        return self.inverse()
+
     def split_lipschitz(self) -> tuple[hurwitzint, hurwitzint | None]:
         """
         Return (whole, half_unit) such that self == whole + half_unit.
