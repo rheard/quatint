@@ -1237,44 +1237,6 @@ class hurwitzint:
 
         return self._make(Ba, Bb, Bc, Bd), best_u
 
-    def _extract_right_prime(self, p: int) -> hurwitzint:
-        """
-        Extract a right prime of norm p dividing self.
-            g = gcd_right(self, p)
-
-        Returns:
-            hurwitzint: The canonical Hurwitz prime with norm p that divides self on the right.
-
-        Raises:
-            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
-        """
-        # Directly extract from q via gcd with the scalar p
-        g = self.gcd_right(p)
-
-        if abs(g) != p:
-            raise ArithmeticError(f"Failed to extract right prime for {p=}")
-
-        return g
-
-    def _extract_left_prime(self, p: int) -> hurwitzint:
-        """
-        Extract a left prime of norm p dividing self.
-            g = gcd_left(self, p)
-
-        Returns:
-            hurwitzint: The canonical Hurwitz prime with norm p that divides self on the left.
-
-        Raises:
-            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
-        """
-        # Directly extract from q via gcd with the scalar p
-        g = self.gcd_left(p)
-
-        if abs(g) != p:
-            raise ArithmeticError(f"Failed to extract left prime for {p=}")
-
-        return g
-
     @classmethod
     def prime_of_norm(cls, p: OTHER_OP_TYPES, *, direction: Literal["left", "right"] = "right") -> hurwitzint:
         """
@@ -1322,6 +1284,54 @@ class hurwitzint:
 
         return g
 
+    def _factor_detail(self, direction: Literal["left", "right"]) -> NonCommutativeFactorization:
+        """
+        The factorization shared by factor_right_detail and factor_left_detail, which differ in one thing: the side.
+
+        direction="right" peels each prime off the right of what is left, as its canonical right divisor of that norm
+            (gcd_right), dividing it off with divmod. direction="left" peels it off the left instead, as its canonical
+            left divisor (gcd_left), dividing it off with rdivmod.
+
+        Returns:
+            NonCommutativeFactorization: The factorization.
+
+        Raises:
+            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
+        """
+        if not self:
+            return NonCommutativeFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction=direction)
+
+        # The content is an integer, which commutes with everything, so it divides out the same from either side
+        m = self.content()
+        q = self // m if m > 1 else self
+
+        # Now q is primitive, so it has one right divisor (and one left divisor) of each prime norm p dividing N(q),
+        #   up to a unit, which is its gcd with p
+        right = direction == "right"
+        nf = _factorint(abs(q))
+
+        primes: list[hurwitzint] = []
+        # Largest norm first, since the primes come off the end and get reversed below
+        for p in sorted(nf.keys(), reverse=True):
+            for _ in range(nf[p]):
+                pi = q.gcd_right(p) if right else q.gcd_left(p)
+                if abs(pi) != p:
+                    raise ArithmeticError(f"Failed to extract {direction} prime for {p=}")
+
+                # q = qq * pi on the right, or q = pi * qq on the left
+                qq, rr = divmod(q, pi) if right else q.rdivmod(pi)
+                if rr:
+                    raise ArithmeticError(f"extracted {direction} prime did not actually divide (unexpected)")
+
+                q = qq
+                primes.append(pi)
+
+        # Remaining q must be a unit (norm 1) if we extracted all prime norms.
+        if abs(q) != 1:
+            raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
+
+        return NonCommutativeFactorization(content=m, unit=q, primes=tuple(reversed(primes)), direction=direction)
+
     def factor_right_detail(self) -> NonCommutativeFactorization:
         """
         Deterministic right factorization normal form (primitive-first).
@@ -1342,49 +1352,8 @@ class hurwitzint:
 
         Returns:
             NonCommutativeFactorization: The factorization.
-
-        Raises:
-            ArithmeticError: If there is an unexpected problem preventing factoring, indicating a bug in the code.
         """
-        if not self:
-            return NonCommutativeFactorization(content=0,
-                                               unit=hurwitzint(1, 0, 0, 0),
-                                               primes=(),
-                                               direction="right")
-
-        # Extract integer content
-        m = self.content()
-
-        q = self
-        if m > 1:
-            q //= hurwitzint(m, 0, 0, 0)
-
-        # Now q is primitive (or at least has no large integer content).
-        n = abs(q)
-        nf = _factorint(n)
-
-        primes: list[hurwitzint] = []
-        # Largest norm first, since the primes come off the right and get reversed below
-        for p in sorted(nf.keys(), reverse=True):
-            e = nf[p]
-            for _ in range(e):
-                pi = q._extract_right_prime(p)
-
-                # divide on the right: q = qq * pi + 0
-                qq, rr = divmod(q, pi)
-                if rr:
-                    raise ArithmeticError("extracted prime did not actually divide (unexpected)")
-                q = qq
-                primes.append(pi)
-
-        # Remaining q must be a unit (norm 1) if we extracted all prime norms.
-        if abs(q) != 1:
-            raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
-
-        return NonCommutativeFactorization(content=m,
-                                           unit=q,
-                                           primes=tuple(reversed(primes)),
-                                           direction="right")
+        return self._factor_detail("right")
 
     def factor_right(self) -> tuple[hurwitzint, ...]:
         """
@@ -1416,43 +1385,8 @@ class hurwitzint:
 
         Returns:
             NonCommutativeFactorization: The factorization.
-
-        Raises:
-            ArithmeticError: If there is a problem preventing factoring.
         """
-        if not self:
-            return NonCommutativeFactorization(content=0, unit=hurwitzint(1, 0, 0, 0), primes=(), direction="left")
-
-        m = self.content()
-
-        q = self
-        if m > 1:
-            q = q.rfloordiv(hurwitzint(m, 0, 0, 0))
-
-        n = abs(q)
-        nf = _factorint(n)
-
-        primes: list[hurwitzint] = []
-        # Largest norm first, since the primes come off the left and get reversed below
-        for p in sorted(nf.keys(), reverse=True):
-            e = nf[p]
-            for _ in range(e):
-                pi = q._extract_left_prime(p)
-
-                # Divide on the left: q = pi * qq
-                qq, rr = q.rdivmod(pi)
-                if rr:
-                    raise ArithmeticError("extracted left prime did not actually divide (unexpected)")
-                q = qq
-                primes.append(pi)
-
-        if abs(q) != 1:
-            raise ArithmeticError("remaining cofactor is not a unit; factorization incomplete")
-
-        return NonCommutativeFactorization(content=m,
-                                           unit=q,
-                                           primes=tuple(reversed(primes)),
-                                           direction="left")
+        return self._factor_detail("left")
 
     def factor_left(self) -> tuple[hurwitzint, ...]:
         """
