@@ -143,17 +143,17 @@ class NonCommutativeFactorization:
         # mypyc's default pickling would set the fields one at a time, which a frozen dataclass refuses
         return NonCommutativeFactorization, (self.content, self.unit, self.primes, self.direction)
 
-    def prod(self):
+    def prod(self) -> hurwitzint:
         """Recreate the number using prod_right or prod_left"""
         if self.direction == "right":
             return self.prod_right()
         return self.prod_left()
 
-    def prod_right(self):
+    def prod_right(self) -> hurwitzint:
         """Recreate the number using prod_right"""
         return prod_right(self.primes, start=self.unit * self.content)
 
-    def prod_left(self):
+    def prod_left(self) -> hurwitzint:
         """Recreate the number using prod_left"""
         return prod_left(self.primes, start=self.unit * self.content)
 
