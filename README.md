@@ -303,6 +303,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `x ** n` → a power, where a negative `n` only works for a unit
 * `abs(h)` → reduced norm `N(h)` (an `int`)
 * `h.is_irreducible` → whether `h` is a Hurwitz prime, which is when its norm is a rational prime
+* `int(h)` / `float(h)` / `complex(h)` → the number a real `h` equals, or `TypeError` for anything else
 * `divmod(a, b)` → left-quotient Euclidean division
 * `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division
 * `a.exact_div_right(b)` / `a.exact_div_left(b)` → the `q` with `a == q*b` / `a == b*q`, or `None` if there is none

@@ -324,6 +324,41 @@ class TestPickle(HurwitzIntTests):
                 assert copied.prod() == value
 
 
+class TestConversions(HurwitzIntTests):
+    """Tests for int(), float() and complex() of a hurwitzint"""
+
+    def test_real_values(self):
+        """A real hurwitzint converts to the int, float and complex it equals, exactly as that int would"""
+        for n in (0, 1, -1, 7, -12, 2**53 + 1, -(10**30) - 7):
+            x = hurwitzint(n)
+            for convert in (int, float, complex):
+                result = convert(x)
+                assert type(result) is type(convert(n))
+                assert result == convert(n)
+
+    def test_non_real_values_raise(self):
+        """Anything with an i, j or k part (so every half-integer) equals no Python number, so converting raises"""
+        for x in (hurwitzint(0, 1, 0, 0), hurwitzint(3, 0, 0, -1), hurwitzint(1, 1, 1, 1, half=True)):
+            for convert in (int, float, complex):
+                with pytest.raises(TypeError, match="not real"):
+                    convert(x)
+
+    def test_not_an_index(self):
+        """
+        Even a real hurwitzint isn't an index, the same in both builds, since mypyc can't give a class __index__.
+            So it doesn't repeat sequences either.
+        """
+        x = hurwitzint(3)
+        for use in (operator.index, range, lambda n: [1, 2, 3, 4][n], lambda n: n * [1], lambda n: "ab" * n):
+            with pytest.raises(TypeError):
+                use(x)
+
+    def test_too_big_for_a_float(self):
+        """Like an int, a real hurwitzint too big for a float raises OverflowError"""
+        with pytest.raises(OverflowError):
+            float(hurwitzint(10**400))
+
+
 class TestComponents(HurwitzIntTests):
     """Tests for reading a hurwitzint's parts: a, b, c and d, len, iteration, indexing, den and is_lipschitz"""
 
