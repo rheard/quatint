@@ -390,7 +390,8 @@ def _sub_mul_numerators(x: tuple[int, int, int, int],
 
 def _residue_numerators(A: int, B: int, C: int, D: int, m: int) -> tuple[int, int, int, int]:
     """
-    Return x % m for x = (A+Bi+Cj+Dk)/2 and an integer m > 0, as numerators, for inv_mod and pow(x, e, m).
+    Return x % m for x = (A+Bi+Cj+Dk)/2 and an integer m > 0, as numerators, for division by an integer, inv_mod and
+        pow(x, e, m).
 
     That is the remainder _divmod_numerators leaves (the one of least norm, with ties going to the largest numerator
         tuple), worked out with much less arithmetic, since the divisor is an integer. Then the remainder's parts are
@@ -706,6 +707,10 @@ class hurwitzint:
         """
         The division shared by __divmod__ and rdivmod: the nearest-lattice division of _divmod_numerators.
 
+        An integer divisor m takes a shortcut. It commutes with everything, so it leaves the same remainder from either
+            side, and that is the residue _residue_numerators works out part by part, with 8 products rather than 36.
+            The quotient is then (self - r) / m, exactly.
+
         Args:
             divisor: The divisor.
             divisor_norm: The divisor norm. Should be checked for 0 already!
@@ -714,8 +719,13 @@ class hurwitzint:
         Returns:
             tuple: The quotient and remainder.
         """
-        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(self._a, self._b, self._c, self._d,
-                                                            divisor._a, divisor._b, divisor._c, divisor._d,
+        A, B, C, D = self._a, self._b, self._c, self._d
+        if not (divisor._b or divisor._c or divisor._d):
+            m = divisor._a // 2
+            Ra, Rb, Rc, Rd = _residue_numerators(A, B, C, D, -m if m < 0 else m)
+            return self._make((A - Ra) // m, (B - Rb) // m, (C - Rc) // m, (D - Rd) // m), self._make(Ra, Rb, Rc, Rd)
+
+        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, divisor._a, divisor._b, divisor._c, divisor._d,
                                                             divisor_norm, right=right)
         return self._make(Qa, Qb, Qc, Qd), self._make(Ra, Rb, Rc, Rd)
 

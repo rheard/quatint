@@ -839,6 +839,26 @@ class TestDiv(HurwitzIntTests):
             for a in rng.sample(values, 60):
                 assert a % b == self.canonical_remainder(a, b)
 
+    def test_integer_divisors(self):
+        """
+        Dividing by an integer (an int, or a real hurwitzint) takes a shortcut, which still leaves the brute-forced
+            remainder, and the same quotient and remainder from either side, for small values (where ties are common)
+            and random ones of every size
+        """
+        rng = random.Random(1_002)
+        small = rng.sample(list(self.wide_search_values(2)), 100)
+        cases = [(a, m) for a in small for m in (1, 2, -2, 3, 4, -6, 7)]
+        for bound in (10**4, 10**30):
+            for _ in range(40):
+                a = self.rand_hurwitzint(rng, bound)
+                cases.extend((a, m) for m in (-1, 5, 12, -97, 10**9 + 7, -(2**64)))
+
+        for a, m in cases:
+            q, r = divmod(a, m)
+            assert q * m + r == a
+            assert r == self.canonical_remainder(a, hurwitzint(m))
+            assert divmod(a, hurwitzint(m)) == a.rdivmod(m) == a.rdivmod(hurwitzint(m)) == (q, r)
+
     def test_remainder_depends_only_on_class(self):
         """
         Values congruent modulo the left multiples of b leave the same remainder, and so do the divisors with the same
