@@ -416,6 +416,46 @@ def _residue_numerators(A: int, B: int, C: int, D: int, m: int) -> tuple[int, in
     return A - _mul(m, Oa), B - _mul(m, Ob), C - _mul(m, Oc), D - _mul(m, Od)
 
 
+def _pow_numerators(A: int, B: int, C: int, D: int, e: int, m: int) -> tuple[int, int, int, int]:
+    """
+    Return x**e for x = (A+Bi+Cj+Dk)/2 and e >= 0, as numerators, for ** (m = 0) and pow(x, e, m) (m > 0).
+
+    This is exponentiation by squaring, on plain int numerators like the division code, so it builds no hurwitzint
+        along the way. Powers of one base commute, so the order of each product doesn't matter. With m > 0, it reduces
+        after every product (see hurwitzint._pow_mod). The result starts out as the first power it takes, rather than
+        as 1, which saves a product: x**2 is a single one.
+
+    Returns:
+        tuple: The power's numerators, over 2.
+    """
+    if m:
+        A, B, C, D = _residue_numerators(A, B, C, D, m)
+
+    started = False
+    Ra = Rb = Rc = Rd = 0
+    while e:
+        if e & 1:
+            if started:
+                Ra, Rb, Rc, Rd = _mul_numerators(Ra, Rb, Rc, Rd, A, B, C, D)
+                if m:
+                    Ra, Rb, Rc, Rd = _residue_numerators(Ra, Rb, Rc, Rd, m)
+            else:
+                Ra, Rb, Rc, Rd = A, B, C, D
+                started = True
+
+        e >>= 1
+        if e:
+            A, B, C, D = _mul_numerators(A, B, C, D, A, B, C, D)
+            if m:
+                A, B, C, D = _residue_numerators(A, B, C, D, m)
+
+    if not started:
+        # x**0 is 1, which is 0 modulo 1
+        return _residue_numerators(2, 0, 0, 0, m) if m else (2, 0, 0, 0)
+
+    return Ra, Rb, Rc, Rd
+
+
 def _uv_for_prime(p: int) -> tuple[int, int]:
     """
     Return the least u >= 0 for which -1 - u^2 is a square mod the prime p, and v, the least square root of it.
@@ -679,16 +719,8 @@ class hurwitzint:
             base = self.conjugate()
             e = -e
 
-        result = hurwitzint(1, 0, 0, 0)  # multiplicative identity
-        while e:
-            if e & 1:
-                result *= base
-
-            e >>= 1
-            if e:
-                base *= base
-
-        return result
+        Ra, Rb, Rc, Rd = _pow_numerators(base._a, base._b, base._c, base._d, e, 0)  # m = 0 for no modulus
+        return self._make(Ra, Rb, Rc, Rd)
 
     # TODO: This only works around a mypyc bug, and can go once that is fixed. When its type check rejects an argument,
     #   mypyc's compiled __pow__ calls the right operand's __rpow__ itself, and without this, a hurwitzint's is the
@@ -1430,31 +1462,15 @@ class hurwitzint:
         Return self**e modulo m > 0, as its canonical residue, for pow(self, e, m). A negative e uses inv_mod.
 
         m is an integer, so its multiples are a two-sided ideal, and the residues of a product only depend on those of
-            its factors. So this reduces after every product, which keeps the numbers small (as Python's pow does
-            for an int). It works on plain int numerators, like the division code, so it builds no hurwitzint until the
-            answer.
+            its factors. So _pow_numerators reduces after every product, which keeps the numbers small (as Python's
+            pow does for an int), and it works on plain int numerators, like the division code, so nothing builds a
+            hurwitzint until the answer.
 
         Returns:
             hurwitzint: The power, reduced.
         """
         base = self.inv_mod(m) if e < 0 else self
-        if e < 0:
-            e = -e
-
-        Ra, Rb, Rc, Rd = _residue_numerators(2, 0, 0, 0, m)  # 1, which is 0 modulo 1
-        Ba, Bb, Bc, Bd = _residue_numerators(base._a, base._b, base._c, base._d, m)
-
-        # Exponentiation by squaring. Powers of one base commute, so the order of each product doesn't matter
-        while e:
-            if e & 1:
-                Pa, Pb, Pc, Pd = _mul_numerators(Ra, Rb, Rc, Rd, Ba, Bb, Bc, Bd)
-                Ra, Rb, Rc, Rd = _residue_numerators(Pa, Pb, Pc, Pd, m)
-
-            e >>= 1
-            if e:
-                Pa, Pb, Pc, Pd = _mul_numerators(Ba, Bb, Bc, Bd, Ba, Bb, Bc, Bd)
-                Ba, Bb, Bc, Bd = _residue_numerators(Pa, Pb, Pc, Pd, m)
-
+        Ra, Rb, Rc, Rd = _pow_numerators(base._a, base._b, base._c, base._d, -e if e < 0 else e, m)
         return self._make(Ra, Rb, Rc, Rd)
     # endregion
 
