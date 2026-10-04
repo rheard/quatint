@@ -933,11 +933,12 @@ class hurwitzint:
     def __bool__(self) -> bool:
         return (self._a | self._b | self._c | self._d) != 0
 
-    # There is no __index__ (for range(x), a[x] and the like), unlike in quadint: mypyc doesn't put it in the type's
-    #   nb_index slot, so it would only work in pure Python (mypyc 2.0, see AS_NUMBER_SLOT_DEFS in its emitclass.py)
-    def __int__(self) -> int:
+    # TODO: mypyc doesn't put __index__ in the type's nb_index slot yet (see AS_NUMBER_SLOT_DEFS in its emitclass.py),
+    #   so compiled, only int() works (through __int__), and operator.index, range(x), a[x] and the like raise
+    #   TypeError. TestConversions.test_index_where_python_wants_an_int will fail once it does, as a reminder.
+    def __index__(self) -> int:
         """
-        Return the int that self equals, for a real hurwitzint.
+        Return the int that self equals, for a real hurwitzint, so it works where Python wants an int, like range().
 
         Returns:
             int: The integer that self is.
@@ -949,6 +950,10 @@ class hurwitzint:
             raise TypeError(f"cannot convert {self!r} to int, since it is not real")
 
         return self._a // 2
+
+    def __int__(self) -> int:
+        # Just __index__, as in quadint. int() would fall back to __index__ anyway, except that mypyc doesn't wire it up
+        return self.__index__()
 
     def __float__(self) -> float:
         """

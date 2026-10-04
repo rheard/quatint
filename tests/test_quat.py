@@ -346,10 +346,11 @@ class TestPickle(HurwitzIntTests):
 
 
 class TestConversions(HurwitzIntTests):
-    """Tests for int(), float() and complex() of a hurwitzint"""
+    """Tests for int(), float(), complex() and __index__ of a hurwitzint"""
 
     def test_real_values(self):
         """A real hurwitzint converts to the int, float and complex it equals, exactly as that int would"""
+        index = hurwitzint.__index__  # Called directly, since the compiled build doesn't use it for operator.index yet
         for n in (0, 1, -1, 7, -12, 2**53 + 1, -(10**30) - 7):
             x = hurwitzint(n)
             for convert in (int, float, complex):
@@ -357,22 +358,37 @@ class TestConversions(HurwitzIntTests):
                 assert type(result) is type(convert(n))
                 assert result == convert(n)
 
+            assert type(index(x)) is int
+            assert index(x) == n
+
     def test_non_real_values_raise(self):
         """Anything with an i, j or k part (so every half-integer) equals no Python number, so converting raises"""
         for x in (hurwitzint(0, 1, 0, 0), hurwitzint(3, 0, 0, -1), hurwitzint(1, 1, 1, 1, half=True)):
-            for convert in (int, float, complex):
+            for convert in (int, float, complex, hurwitzint.__index__):
                 with pytest.raises(TypeError, match="not real"):
                     convert(x)
 
-    def test_not_an_index(self):
+    def test_index_where_python_wants_an_int(self):
         """
-        Even a real hurwitzint isn't an index, the same in both builds, since mypyc can't give a class __index__.
-            So it doesn't repeat sequences either.
+        Through __index__, a real hurwitzint works where Python wants an int, like range() or a[x], in pure Python.
+
+        The compiled build can't do that yet, since mypyc doesn't put __index__ in the type's slot (see the TODO on
+            __index__). Once it does, the compiled half of this fails, as a reminder to drop the TODO and this branch.
         """
-        x = hurwitzint(3)
-        for use in (operator.index, range, lambda n: [1, 2, 3, 4][n], lambda n: n * [1], lambda n: "ab" * n):
+        uses = (operator.index, lambda n: list(range(n)), lambda n: "abcd"[n], lambda n: n * [1], lambda n: gcd(n, 12))
+        expected = (3, [0, 1, 2], "d", [1, 1, 1], 3)
+        if quatint.quat.__file__.endswith(".py"):
+            for use, result in zip(uses, expected, strict=True):
+                assert use(hurwitzint(3)) == result
+        else:
+            for use in uses:
+                with pytest.raises(TypeError):
+                    use(hurwitzint(3))
+
+        # Anything that isn't real never works as an int
+        for use in uses:
             with pytest.raises(TypeError):
-                use(x)
+                use(hurwitzint(3, 1, 0, 0))
 
     def test_too_big_for_a_float(self):
         """Like an int, a real hurwitzint too big for a float raises OverflowError"""
