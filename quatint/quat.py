@@ -926,7 +926,15 @@ class hurwitzint:
         if isinstance(other, int):
             return self._b == 0 and self._c == 0 and self._d == 0 and self._a == 2 * other
 
-        if isinstance(other, (float, complex)):
+        # Separate checks, since mypyc compiles isinstance against a tuple to a generic call, but against float alone
+        #   to a quick type check. (complex has no quick check, but only what isn't a float gets that far.)
+        if isinstance(other, float):
+            if not other.is_integer():
+                return False
+
+            return self._b == 0 and self._c == 0 and self._d == 0 and self._a == 2 * int(other)
+
+        if isinstance(other, complex):
             real, imag = other.real, other.imag
             if imag or not real.is_integer():
                 return False
