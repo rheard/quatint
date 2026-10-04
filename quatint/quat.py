@@ -3,13 +3,26 @@ from __future__ import annotations
 from bisect import bisect_left
 from dataclasses import dataclass
 from math import gcd, prod
-from typing import ClassVar, Iterable, Iterator, Literal, Union
+from typing import ClassVar, Iterable, Iterator, Literal, TypeGuard, Union
 
 from sympy import factorint, isprime
 
 OTHER_OP_TYPES = int | float
-_OTHER_OP_TYPES = (int, float)  # mypyc-friendly for isinstance
 OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
+
+
+def _is_number(x: object) -> TypeGuard[OTHER_OP_TYPES]:
+    """
+    Return whether x is an int or a float (so a bool too), the plain numbers that hurwitzint takes everywhere.
+
+    This is isinstance(x, (int, float)) in two halves, since mypyc compiles isinstance against one builtin type to a
+        quick type check, but against a tuple to a generic isinstance call, which is far slower. Every operation that
+        can take a number makes this check.
+
+    Returns:
+        bool: Whether x is an int or float.
+    """
+    return isinstance(x, int) or isinstance(x, float)  # ruff: ignore[duplicate-isinstance-call]
 
 
 @dataclass(frozen=True, slots=True)
@@ -457,7 +470,7 @@ class hurwitzint:
     @classmethod
     def _from_obj(cls, n: OP_TYPES) -> hurwitzint:
         """Convert a random object to a hurwitzint"""
-        if isinstance(n, _OTHER_OP_TYPES):
+        if _is_number(n):
             # scalar n -> (2n + 0i + 0j + 0k)/2
             return cls._make(2 * int(n), 0, 0, 0)
 
@@ -482,12 +495,10 @@ class hurwitzint:
         return self._make(self._a, -self._b, -self._c, -self._d)
 
     def __add__(self, other: OP_TYPES) -> hurwitzint:
-        # A hurwitzint is checked for first: under mypyc that is a pointer compare, while the check for a number is a
-        #   generic isinstance against a tuple, which took about a third of a + b
         if isinstance(other, hurwitzint):
             return self._make(self._a + other._a, self._b + other._b, self._c + other._c, self._d + other._d)
 
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             # A number only moves the real part, whose numerator is twice the number: n + n, since mypyc's int multiply
             #   leaves its fast path for a negative n (see _mul)
             n = other if type(other) is int else int(other)
@@ -502,7 +513,7 @@ class hurwitzint:
         if isinstance(other, hurwitzint):
             return self._make(self._a - other._a, self._b - other._b, self._c - other._c, self._d - other._d)
 
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             n = other if type(other) is int else int(other)
             return self._make(self._a - n - n, self._b, self._c, self._d)
 
@@ -510,7 +521,7 @@ class hurwitzint:
 
     def __rsub__(self, other: OTHER_OP_TYPES) -> hurwitzint:
         # other - self, without making -self first
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             n = other if type(other) is int else int(other)
             return self._make(n + n - self._a, -self._b, -self._c, -self._d)
 
@@ -527,7 +538,7 @@ class hurwitzint:
             P, Q, R, S = _mul_numerators(self._a, self._b, self._c, self._d, other._a, other._b, other._c, other._d)
             return self._make(P, Q, R, S)
 
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             # A number scales every part: 4 products, rather than a quaternion product's 16
             n = other if type(other) is int else int(other)
             return self._make(_mul(self._a, n), _mul(self._b, n), _mul(self._c, n), _mul(self._d, n))
@@ -540,7 +551,7 @@ class hurwitzint:
     # Not just `exp: float`, since mypyc would turn an int exponent into a double and lose every bit past 2**53
     def __pow__(self, exp: OTHER_OP_TYPES) -> hurwitzint:
         # The mypyc build rejects anything else before getting here, so this makes pure Python match it
-        if not isinstance(exp, _OTHER_OP_TYPES):
+        if not _is_number(exp):
             return NotImplemented
 
         e = int(exp)
@@ -598,7 +609,7 @@ class hurwitzint:
         Raises:
             ZeroDivisionError: if other == 0
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -612,7 +623,7 @@ class hurwitzint:
         return self._division(other, n)
 
     def __rdivmod__(self, other: OTHER_OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__divmod__(self)
 
@@ -623,7 +634,7 @@ class hurwitzint:
         return self.__floordiv__(other)
 
     def __rtruediv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__truediv__(self)
 
@@ -638,7 +649,7 @@ class hurwitzint:
         return qr[0]
 
     def __rfloordiv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__floordiv__(self)
 
@@ -652,7 +663,7 @@ class hurwitzint:
         return qr[1]
 
     def __rmod__(self, other: OTHER_OP_TYPES) -> hurwitzint:
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__mod__(self)
 
@@ -674,7 +685,7 @@ class hurwitzint:
             TypeError: If other is an unsupported type.
             ZeroDivisionError: If trying to divide by 0.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -761,7 +772,7 @@ class hurwitzint:
             TypeError: If other is an unsupported type.
             ZeroDivisionError: If other is 0.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -788,7 +799,7 @@ class hurwitzint:
             TypeError: If other is an unsupported type.
             ZeroDivisionError: If other is 0.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -814,7 +825,7 @@ class hurwitzint:
         Raises:
             TypeError: If other is an unsupported type.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -840,7 +851,7 @@ class hurwitzint:
         Raises:
             TypeError: If other is an unsupported type.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -1019,7 +1030,7 @@ class hurwitzint:
         Raises:
             TypeError: If other is an unsupported type.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -1058,7 +1069,7 @@ class hurwitzint:
         Raises:
             TypeError: If other is an unsupported type.
         """
-        if isinstance(other, _OTHER_OP_TYPES):
+        if _is_number(other):
             other = self._from_obj(other)
 
         if not isinstance(other, hurwitzint):
@@ -1316,7 +1327,7 @@ class hurwitzint:
             ArithmeticError: If the gcd does not have norm p, indicating a bug in the code.
         """
         # The mypyc build rejects anything else before getting here, so this makes pure Python match it
-        if not isinstance(p, _OTHER_OP_TYPES):
+        if not _is_number(p):
             raise TypeError(f"unsupported type for prime_of_norm: {type(p).__name__!r}")
 
         if direction not in ("left", "right"):
@@ -1532,7 +1543,7 @@ def _to_hurwitzint(n: OP_TYPES, name: str) -> hurwitzint:
         return n
 
     # The mypyc build rejects anything else before getting here, so this makes pure Python match it
-    if not isinstance(n, _OTHER_OP_TYPES):
+    if not _is_number(n):
         raise TypeError(f"unsupported type for {name}: {type(n).__name__!r}")
 
     return hurwitzint(n)
