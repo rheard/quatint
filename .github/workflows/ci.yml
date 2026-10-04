@@ -57,9 +57,10 @@ jobs:
 
       - name: Generate and place stubs
         shell: bash
+        # From the source, not --inspect-mode, which leaves properties and dataclass fields untyped
         run: |
           python -m pip install --upgrade mypy "sympy<=1.12.1"
-          stubgen -p quatint --include-private --include-docstrings --inspect-mode
+          stubgen -p quatint --include-private --include-docstrings
           cp -r out/quatint/. quatint-stubs/
           rm -rf out
 

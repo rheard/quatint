@@ -1,11 +1,24 @@
 from quatint.quat import (
-    NonCommutativeFactorization as NonCommutativeFactorization,
-    gcd_left as gcd_left,
-    gcd_right as gcd_right,
-    hurwitzint as hurwitzint,
-    prod_left as prod_left,
-    prod_right as prod_right,
-    rdivmod as rdivmod,
-    xgcd_left as xgcd_left,
-    xgcd_right as xgcd_right,
+    NonCommutativeFactorization,
+    gcd_left,
+    gcd_right,
+    hurwitzint,
+    prod_left,
+    prod_right,
+    rdivmod,
+    xgcd_left,
+    xgcd_right,
 )
+
+# The exports are listed here, rather than imported `as` themselves, since stubgen drops those imports from the stubs
+__all__ = [
+    "NonCommutativeFactorization",
+    "gcd_left",
+    "gcd_right",
+    "hurwitzint",
+    "prod_left",
+    "prod_right",
+    "rdivmod",
+    "xgcd_left",
+    "xgcd_right",
+]
