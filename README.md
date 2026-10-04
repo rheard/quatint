@@ -174,6 +174,24 @@ assert a * s + b * t == g
 
 Like `gcd_left` and `gcd_right`, they also come as functions: `xgcd_left(a, b)` and `xgcd_right(a, b)`.
 
+### Modular arithmetic
+
+`x.inv_mod(m)` is the inverse of `x` modulo an integer `m`, on both sides: `x * y` and `y * x` are both 1 modulo `m`.
+    It exists when the norm `abs(x)` and `m` are coprime, and otherwise this raises `ValueError`:
+
+```python
+from quatint import hurwitzint
+
+x = hurwitzint(1, 1, 0, 0)  # 1+i, of norm 2
+y = x.inv_mod(3)
+print(y)  # (-1+i+0j+0k)
+assert hurwitzint(3).divides_right(x * y - 1) and hurwitzint(3).divides_right(y * x - 1)
+```
+
+The modulus has to be an integer (or a real `hurwitzint`), since only an integer's multiples are the same from either side.
+    The result is the canonical residue of its class: the element of least norm, with ties going to the largest numerator tuple, so congruent values always give the very same result.
+    `x % m` is the Euclidean remainder, which can only differ from that when `x / m` lies exactly between Hurwitz integers, where `%` breaks the tie its own way.
+
 ### Primes of a given norm
 
 Every rational prime `p` is the norm of a Hurwitz prime, and `hurwitzint.prime_of_norm(p)` returns a fixed one (always the same one for the same `p`).
@@ -312,6 +330,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `a.gcd_right(b)` / `gcd_right(a, b)`
 * `a.xgcd_left(b)` / `xgcd_left(a, b)` → `(g, s, t)` with `a*s + b*t == g`
 * `a.xgcd_right(b)` / `xgcd_right(a, b)` → `(g, s, t)` with `s*a + t*b == g`
+* `a.inv_mod(m)` → the inverse of `a` modulo the integer `m`, on both sides
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`

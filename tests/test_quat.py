@@ -142,6 +142,27 @@ class HurwitzIntTests:
         assert smallest is not None
         return smallest
 
+    @staticmethod
+    def brute_residue(x: hurwitzint, m: int) -> hurwitzint:
+        """
+        Brute-force the canonical residue of x modulo the integer m > 0: of every x - m*q, the one of least norm, and
+            of those, the one with the largest numerator tuple.
+
+        Like smallest_remainder_norm: in every part, q's numerator is one of the two integers of its parity around
+            x's numerator over m, so trying all 2 * 2**4 of those is sure to include every remainder of least norm.
+
+        Returns:
+            hurwitzint: The residue.
+        """
+        candidates = []
+        for parity in (0, 1):
+            lows = [n // m - ((n // m - parity) & 1) for n in x]
+            for steps in product((0, 2), repeat=4):
+                q = hurwitzint(*(low + step for low, step in zip(lows, steps, strict=True)), half=True)
+                candidates.append(x - m * q)
+
+        return min(candidates, key=lambda r: (abs(r), [-n for n in r]))
+
 
 class TestEq(HurwitzIntTests):
     """Tests for __eq__"""
@@ -1826,6 +1847,134 @@ class TestModuleLevelHelpers(HurwitzIntTests):
             for a in ("a", None, [1], complex(1, 2)):
                 with pytest.raises(TypeError):
                     helper(a, hurwitzint(1, 2, 3, 4))
+
+
+class TestResidue(HurwitzIntTests):
+    """Tests for _residue_numerators, the canonical residue that inv_mod reduces to"""
+
+    @staticmethod
+    def residue(x: hurwitzint, m: int) -> hurwitzint:
+        """The canonical residue of x modulo m > 0, from _residue_numerators"""
+        return hurwitzint(*quatint.quat._residue_numerators(*x, m), half=True)
+
+    def test_matches_brute_force(self):
+        """
+        The residue is the brute-forced one, the least norm with ties going to the largest tuple, for every small
+            value modulo the small moduli that make the most ties, and random values of every size modulo bigger ones
+        """
+        for m in (2, 3, 4):
+            for x in self.wide_search_values(2):
+                assert self.residue(x, m) == self.brute_residue(x, m)
+
+        rng = random.Random(17_000)
+        for bound in (10, 10**4, 10**30):
+            for _ in range(30):
+                x = self.rand_hurwitzint(rng, bound)
+                for m in (1, 5, 6, 7, 12, 97, 10**9 + 7, 2**64):
+                    assert self.residue(x, m) == self.brute_residue(x, m)
+
+    def test_congruent_values(self):
+        """Values congruent modulo m have the very same residue, though x % m can differ between them"""
+        rng = random.Random(17_001)
+        shifts = (hurwitzint(1), hurwitzint(-1), hurwitzint(0, 1, 0, 0), hurwitzint(1, 1, 1, 1, half=True),
+                  hurwitzint(-1, 1, -1, 1, half=True))
+        remainders_differ = 0
+        for _ in range(100):
+            x = self.rand_hurwitzint(rng, 10)
+            m = rng.choice((2, 3, 4, 6))
+            r = self.residue(x, m)
+            assert hurwitzint(m).divides_right(x - r)
+            for h in shifts:
+                assert self.residue(x + m * h, m) == r
+                remainders_differ += (x + m * h) % m != x % m
+
+        assert remainders_differ > 0  # Otherwise this would test nothing that % doesn't do already
+
+
+class TestInvMod(HurwitzIntTests):
+    """Tests for inv_mod, the inverse modulo an integer, on both sides"""
+
+    def test_examples(self):
+        """Some inverses worked out by hand"""
+        # (1+i) * (-1+i) == -2, which is 1 mod 3
+        assert hurwitzint(1, 1, 0, 0).inv_mod(3) == hurwitzint(-1, 1, 0, 0)
+
+        # 3 * -2 == -6, which is 1 mod 7. pow(3, -1, 7) is 5, but -2 is the residue of least norm
+        assert hurwitzint(3).inv_mod(7) == -2
+
+        # A unit's inverse is its conjugate, which is the least norm there is, but mod 2 so is its negative. Then the
+        #   larger numerator tuple wins: (1+i+j+k)/2 over (-1-i-j-k)/2
+        u = hurwitzint(-1, 1, 1, 1, half=True)
+        assert u.inv_mod(5) == ~u == hurwitzint(-1, -1, -1, -1, half=True)
+        assert u.inv_mod(2) == -~u == hurwitzint(1, 1, 1, 1, half=True)
+
+        # Everything is 0 mod 1, so 0 is everything's inverse
+        assert hurwitzint(5, 3, 1, 2).inv_mod(1) == hurwitzint(0).inv_mod(-1) == 0
+
+    def test_inverse_on_both_sides(self):
+        """For random x and m, x times its inverse is 1 modulo m on either side, whenever N(x) and m are coprime"""
+        rng = random.Random(16_000)
+        invertible = 0
+        for bound in (3, 10**4, 10**12):
+            for _ in range(80):
+                x = self.rand_hurwitzint(rng, bound)
+                m = rng.choice((2, 3, 4, 5, 7, 12, 97, 1000, 10**9 + 7, 2**61 - 1))
+                if gcd(abs(x), m) != 1:
+                    with pytest.raises(ValueError, match="not invertible mod"):
+                        x.inv_mod(m)
+
+                    continue
+
+                invertible += 1
+                y = x.inv_mod(m)
+                assert hurwitzint(m).divides_right(x * y - 1)
+                assert hurwitzint(m).divides_right(y * x - 1)
+                assert y == self.brute_residue(y, m)
+
+        assert invertible > 100
+
+    def test_canonical(self):
+        """Congruent values have the very same inverse, the canonical residue of the inverse's class"""
+        rng = random.Random(16_001)
+        for _ in range(60):
+            x = self.rand_hurwitzint(rng, 100)
+            m = rng.choice((2, 3, 4, 6, 7, 10))
+            if gcd(abs(x), m) != 1:
+                continue
+
+            # conj(x) / N(x) is the inverse, so conj(x) times the inverse of N(x) mod m is an inverse mod m
+            y = x.inv_mod(m)
+            assert y == self.brute_residue(x.conjugate() * pow(abs(x), -1, m), m)
+            for h in (hurwitzint(1), hurwitzint(1, 1, 1, 1, half=True), self.rand_hurwitzint(rng, 10)):
+                assert (x + m * h).inv_mod(m) == y
+
+    def test_not_invertible(self):
+        """There is no inverse when N(x) shares a factor with the modulus, as for 0, or 1+i mod 2"""
+        for x, m in ((hurwitzint(0), 5), (hurwitzint(1, 1, 0, 0), 2), (hurwitzint(3), 6), (hurwitzint(1, 2, 3, 4), 10)):
+            with pytest.raises(ValueError, match="not invertible mod"):
+                x.inv_mod(m)
+
+    def test_moduli(self):
+        """A float modulus is truncated, and a negative one, or a real hurwitzint, works like the positive int"""
+        x = hurwitzint(3, -5, 7, 9, half=True)  # norm 41
+        expected = x.inv_mod(7)
+        for mod in (7.0, 7.9, -7, -7.5, hurwitzint(7), hurwitzint(-7)):
+            assert x.inv_mod(mod) == expected
+
+    def test_bad_moduli(self):
+        """A modulus of 0 raises ZeroDivisionError, a hurwitzint off the real axis ValueError, and the rest TypeError"""
+        x = hurwitzint(3, -5, 7, 9, half=True)
+        for zero in (0, 0.0, 0.9, hurwitzint(0)):
+            with pytest.raises(ZeroDivisionError):
+                x.inv_mod(zero)
+
+        for mod in (hurwitzint(1, 1, 0, 0), hurwitzint(3, 1, 1, 1, half=True)):
+            with pytest.raises(ValueError, match="integer modulus"):
+                x.inv_mod(mod)
+
+        for mod in ("7", None, [7], complex(7, 0)):
+            with pytest.raises(TypeError):
+                x.inv_mod(mod)
 
 
 class TestContent(HurwitzIntTests):

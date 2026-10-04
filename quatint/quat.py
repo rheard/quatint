@@ -302,6 +302,53 @@ def _sub_mul_numerators(x: tuple[int, int, int, int],
     return xa - Pa, xb - Pb, xc - Pc, xd - Pd
 
 
+def _residue_part(A: int, m: int, parity: int) -> int:
+    """
+    Return A - m*Q for the Q of the given parity nearest A/m (with m > 0), taking the smaller Q on a tie.
+
+    The two integers of that parity around A/m are lo <= A/m < lo + 2, which leave A - m*lo in [0, 2m), or 2m less.
+        The nearer one leaves the smaller of those, and on a tie (A - m*lo == m) the smaller Q leaves the larger, +m.
+        So the result is in (-m, m].
+
+    Returns:
+        int: A - m*Q.
+    """
+    lo = A // m
+    if (lo - parity) & 1:
+        lo -= 1
+
+    r = A - _mul(m, lo)
+    return r if r <= m else r - 2 * m
+
+
+def _residue_numerators(A: int, B: int, C: int, D: int, m: int) -> tuple[int, int, int, int]:
+    """
+    Return the canonical residue of x = (A+Bi+Cj+Dk)/2 modulo the integer m > 0, as numerators.
+
+    That is the x - m*q (q a Hurwitz integer) of least norm, with ties going to the largest numerator tuple, like
+        _canonical_associate. It depends only on x's residue class modulo m, so congruent values reduce to the same
+        residue. x % m doesn't promise that: its quotient breaks ties with fixed rules (like rounding halves away from
+        zero), so when x / m lies exactly between Hurwitz integers, its remainder depends on which x it started from.
+
+    In numerators, the remainder's parts are A - m*Qa and so on, where q's numerators Qa..Qd share one parity. For each
+        parity the parts are independent, so _residue_part picks each one, taking the larger part on a tie. Then the
+        smaller sum of squares wins, and on a tie the larger tuple, which the first parts decide, since they always
+        differ (by m times an odd number).
+
+    Returns:
+        tuple: The residue's numerators, over 2.
+    """
+    Ea, Eb, Ec, Ed = _residue_part(A, m, 0), _residue_part(B, m, 0), _residue_part(C, m, 0), _residue_part(D, m, 0)
+    Oa, Ob, Oc, Od = _residue_part(A, m, 1), _residue_part(B, m, 1), _residue_part(C, m, 1), _residue_part(D, m, 1)
+
+    even = _mul(Ea, Ea) + _mul(Eb, Eb) + _mul(Ec, Ec) + _mul(Ed, Ed)
+    odd = _mul(Oa, Oa) + _mul(Ob, Ob) + _mul(Oc, Oc) + _mul(Od, Od)
+    if even < odd or (even == odd and Ea > Oa):
+        return Ea, Eb, Ec, Ed
+
+    return Oa, Ob, Oc, Od
+
+
 def _uv_for_prime(p: int) -> tuple[int, int]:
     """
     Return the least u >= 0 for which -1 - u^2 is a square mod the prime p, and v, the least square root of it.
@@ -1214,6 +1261,74 @@ class hurwitzint:
             s, t = s * u, t * u
 
         return g, s, t
+    # endregion
+
+    # region Modular arithmetic
+    @staticmethod
+    def _modulus(mod: OP_TYPES, name: str) -> int:
+        """
+        Return the positive integer that mod stands for, as the modulus of inv_mod or pow(x, e, mod).
+
+        Only an integer works as a modulus. It commutes with everything, so its multiples are the same from either side
+            (a two-sided ideal), and reducing modulo it works for products, on either side. The multiples of a
+            hurwitzint off the real axis are not, so one of those raises ValueError. m and -m have the same multiples.
+
+        Returns:
+            int: abs(mod), with a float truncated with int() first, like everywhere else a float meets a hurwitzint.
+
+        Raises:
+            TypeError: If mod is not a hurwitzint, int or float.
+            ValueError: If mod is a hurwitzint off the real axis.
+            ZeroDivisionError: If mod is 0.
+        """
+        if isinstance(mod, hurwitzint):
+            if mod._b or mod._c or mod._d:
+                raise ValueError(f"{name} needs an integer modulus, not {mod!r}")
+
+            m = mod._a // 2
+        elif _is_number(mod):
+            m = mod if type(mod) is int else int(mod)
+        else:
+            # The mypyc build rejects anything else before getting here, so this makes pure Python match it
+            raise TypeError(f"unsupported type for {name}: {type(mod).__name__!r}")
+
+        if m == 0:
+            raise ZeroDivisionError(f"{name} modulus cannot be 0")
+
+        return -m if m < 0 else m
+
+    def inv_mod(self, mod: OP_TYPES) -> hurwitzint:
+        """
+        Return the inverse of self modulo the integer mod: the y with x*y and y*x both congruent to 1 modulo mod.
+
+        x * conj(x) == conj(x) * x == N(x), so if N(x) has an inverse k modulo mod, conj(x) * k is an inverse of x,
+            on both sides. Otherwise x has none, since N(x)*N(y) == N(x*y) would have to be 1 modulo mod. So x is
+            invertible modulo mod exactly when N(x) and mod are coprime, and then its inverse is unique modulo mod.
+
+        It comes back as the canonical residue of its class, like the result of pow(x, e, mod): the one of least norm,
+            with ties going to the largest numerator tuple. That is (y % mod) for any inverse y, except when y / mod
+            lies exactly between Hurwitz integers, where % breaks the tie its own way.
+
+        The modulus has to be an integer, since only an integer's multiples are the same on either side: a float is
+            truncated with int() and a hurwitzint has to be real (or this raises ValueError). A modulus of 0 raises
+            ZeroDivisionError, and anything but a hurwitzint, int or float raises TypeError.
+
+        Returns:
+            hurwitzint: The inverse, reduced modulo mod.
+
+        Raises:
+            ValueError: If self is not invertible modulo mod, which is when N(self) shares a factor with it.
+        """
+        m = self._modulus(mod, "inv_mod")
+        n = abs(self)
+        if gcd(n, m) != 1:
+            raise ValueError(f"{self!r} is not invertible mod {m}, since its norm {n} shares a factor with it")
+
+        # conj(self) * k, as numerators
+        k = pow(n, -1, m)
+        Ca, Cb, Cc, Cd = _mul(self._a, k), -_mul(self._b, k), -_mul(self._c, k), -_mul(self._d, k)
+        Ra, Rb, Rc, Rd = _residue_numerators(Ca, Cb, Cc, Cd, m)
+        return self._make(Ra, Rb, Rc, Rd)
     # endregion
 
     # region Factoring
