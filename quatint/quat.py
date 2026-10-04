@@ -93,13 +93,19 @@ class NonCommutativeFactorization:
 
         Raises:
             TypeError: If factors has anything but ints in it.
-            ValueError: If factors does not multiply to content, or has a key that is not prime.
+            ValueError: If factors has a negative exponent, does not multiply to content, or has a key that is not
+                prime.
         """
         m = self.content
         if factors is not None:
             # The mypyc build rejects anything but ints before getting here, so this makes pure Python match it
             if not all(isinstance(p, int) and isinstance(e, int) for p, e in factors.items()):
                 raise TypeError("factors must map int primes to int exponents")
+
+            # Before the product, since a negative exponent would make it a float, and that can round to exactly the
+            #   content: 2**60 * 3**-1 rounds to 384307168202282304, which would then expand as if it were 2**60
+            if any(e < 0 for e in factors.values()):
+                raise ValueError("factors can't have negative exponents")
 
             # prime_of_norm checks that each p is prime, below
             if prod(p**e for p, e in factors.items()) != m:

@@ -2686,9 +2686,17 @@ class TestExpandContent(HurwitzIntTests):
     def test_bad_factors(self):
         """The factors given have to be the content's prime factorization, with nothing but ints, in both builds"""
         factors = hurwitzint(527).factor_right_detail()  # 17 * 31
-        for bad in ({17: 1}, {17: 1, 31: 2}, {17: 2, 31: -1}, {527: 1}, {-17: 1, -31: 1}):
+        for bad in ({17: 1}, {17: 1, 31: 2}, {527: 1}, {-17: 1, -31: 1}):
             with pytest.raises(ValueError, match=r"content|prime"):
                 factors.expand_content(factors=bad)
+
+        # A negative exponent, even where the float product rounds to exactly the content, as 2**60 * 3**-1 does here
+        m = 384307168202282304
+        assert m == 2**60 * 3**-1
+        for n, bad in ((hurwitzint(527), {17: 2, 31: -1}), (hurwitzint(m), {2: 60, 3: -1})):
+            for direction in ("right", "left"):
+                with pytest.raises(ValueError, match="negative"):
+                    self.detail(n, direction).expand_content(factors=bad)
 
         for bad in ({17.0: 1, 31: 1}, {17: 1.0, 31: 1}):
             with pytest.raises(TypeError):
