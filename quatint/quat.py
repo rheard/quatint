@@ -715,13 +715,9 @@ class hurwitzint:
     # endregion
 
     # region Exact division
-    def _exact_division(self,
-                        divisor: hurwitzint,
-                        divisor_norm: int,
-                        *,
-                        right: bool = False) -> hurwitzint | None:
+    def _exact_division(self, divisor: hurwitzint, *, right: bool = False) -> hurwitzint | None:
         """
-        The exact division shared by exact_div_right and exact_div_left.
+        The exact division shared by exact_div_right and exact_div_left, and through _divides by divides_*.
 
         The quotient self / divisor is self * conj(divisor) / N(divisor) (or conj(divisor) * self / N(divisor)
             with right=True), as in _divmod_numerators, so each numerator of self * conj(divisor), over N(divisor),
@@ -730,15 +726,20 @@ class hurwitzint:
 
         Args:
             divisor: The divisor.
-            divisor_norm: The divisor norm. Should be checked for 0 already!
             right: Divide on the right (self == divisor*q), rather than on the left (self == q*divisor).
 
         Returns:
             hurwitzint | None: The quotient q, or None if no Hurwitz integer q divides exactly.
+
+        Raises:
+            ZeroDivisionError: If divisor is 0.
         """
+        n = abs(divisor)
+        if n == 0:
+            raise ZeroDivisionError
+
         A, B, C, D = self._a, self._b, self._c, self._d
         E, F, G, H = divisor._a, divisor._b, divisor._c, divisor._d
-        n = divisor_norm
 
         # Conjugating the divisor just flips the signs of its i, j and k parts
         if right:
@@ -763,26 +764,13 @@ class hurwitzint:
 
         This divides other off the right of self, when other is a right divisor of self: like gcd_right,
             it is named for the side of self that other divides. It is the exact version of divmod(self, other),
-            whose quotient it returns whenever the remainder is 0, and it returns None otherwise.
+            whose quotient it returns whenever the remainder is 0, and it returns None otherwise. Like divmod,
+            it raises ZeroDivisionError for an other of 0, and TypeError for anything but a hurwitzint, int or float.
 
         Returns:
             hurwitzint | None: The quotient q, or None if no Hurwitz integer q gives self == q * other.
-
-        Raises:
-            TypeError: If other is an unsupported type.
-            ZeroDivisionError: If other is 0.
         """
-        if _is_number(other):
-            other = self._from_obj(other)
-
-        if not isinstance(other, hurwitzint):
-            raise TypeError(f"unsupported type for exact_div_right: {type(other).__name__!r}")
-
-        n = abs(other)
-        if n == 0:
-            raise ZeroDivisionError
-
-        return self._exact_division(other, n)
+        return self._exact_division(_to_hurwitzint(other, "exact_div_right"))
 
     def exact_div_left(self, other: OP_TYPES) -> hurwitzint | None:
         """
@@ -790,26 +778,30 @@ class hurwitzint:
 
         This divides other off the left of self, when other is a left divisor of self: like gcd_left,
             it is named for the side of self that other divides. It is the exact version of self.rdivmod(other),
-            whose quotient it returns whenever the remainder is 0, and it returns None otherwise.
+            whose quotient it returns whenever the remainder is 0, and it returns None otherwise. Like rdivmod,
+            it raises ZeroDivisionError for an other of 0, and TypeError for anything but a hurwitzint, int or float.
 
         Returns:
             hurwitzint | None: The quotient q, or None if no Hurwitz integer q gives self == other * q.
-
-        Raises:
-            TypeError: If other is an unsupported type.
-            ZeroDivisionError: If other is 0.
         """
-        if _is_number(other):
-            other = self._from_obj(other)
+        return self._exact_division(_to_hurwitzint(other, "exact_div_left"), right=True)
 
-        if not isinstance(other, hurwitzint):
-            raise TypeError(f"unsupported type for exact_div_left: {type(other).__name__!r}")
+    def _divides(self, dividend: hurwitzint, *, right: bool = False) -> bool:
+        """
+        The divisibility test shared by divides_right and divides_left: whether dividend divides exactly by self.
 
-        n = abs(other)
-        if n == 0:
-            raise ZeroDivisionError
+        Args:
+            dividend: What self might divide.
+            right: Whether dividend == self*q for some q, rather than dividend == q*self.
 
-        return self._exact_division(other, n, right=True)
+        Returns:
+            bool: Whether self divides dividend on that side.
+        """
+        # Everything divides 0, and 0 divides only 0, so this never divides by 0
+        if not self:
+            return not dividend
+
+        return dividend._exact_division(self, right=right) is not None
 
     def divides_right(self, other: OP_TYPES) -> bool:
         """
@@ -817,25 +809,13 @@ class hurwitzint:
 
         That is, iff other.exact_div_right(self) finds a quotient. Note which way round that is: self is the
             divisor, as in "self divides other". Everything divides 0, and 0 divides only 0, so unlike
-            exact_div_right this never raises ZeroDivisionError.
+            exact_div_right this never raises ZeroDivisionError. It does raise TypeError for an other that is not
+            a hurwitzint, int or float.
 
         Returns:
             bool: Whether self divides other on the right.
-
-        Raises:
-            TypeError: If other is an unsupported type.
         """
-        if _is_number(other):
-            other = self._from_obj(other)
-
-        if not isinstance(other, hurwitzint):
-            raise TypeError(f"unsupported type for divides_right: {type(other).__name__!r}")
-
-        n = abs(self)
-        if n == 0:
-            return not other  # 0 only divides 0
-
-        return other._exact_division(self, n) is not None
+        return self._divides(_to_hurwitzint(other, "divides_right"))
 
     def divides_left(self, other: OP_TYPES) -> bool:
         """
@@ -843,25 +823,13 @@ class hurwitzint:
 
         That is, iff other.exact_div_left(self) finds a quotient. Note which way round that is: self is the
             divisor, as in "self divides other". Everything divides 0, and 0 divides only 0, so unlike
-            exact_div_left this never raises ZeroDivisionError.
+            exact_div_left this never raises ZeroDivisionError. It does raise TypeError for an other that is not
+            a hurwitzint, int or float.
 
         Returns:
             bool: Whether self divides other on the left.
-
-        Raises:
-            TypeError: If other is an unsupported type.
         """
-        if _is_number(other):
-            other = self._from_obj(other)
-
-        if not isinstance(other, hurwitzint):
-            raise TypeError(f"unsupported type for divides_left: {type(other).__name__!r}")
-
-        n = abs(self)
-        if n == 0:
-            return not other  # 0 only divides 0
-
-        return other._exact_division(self, n, right=True) is not None
+        return self._divides(_to_hurwitzint(other, "divides_left"), right=True)
     # endregion
 
     def __abs__(self) -> int:
@@ -1539,7 +1507,11 @@ if not hurwitzint.UNITS:
 
 def _to_hurwitzint(n: OP_TYPES, name: str) -> hurwitzint:
     """
-    Return n as a hurwitzint, so the module-level helpers below take a plain number first too, like gcd_right(12, b).
+    Return n as a hurwitzint, for the methods and module-level helpers that take a plain number in place of one.
+
+    Those raise TypeError for anything else, naming themselves (unlike the operators, which return NotImplemented).
+        So exact_div_right(3) divides by hurwitzint(3), and the module-level gcd_right(12, b) is
+        hurwitzint(12).gcd_right(b).
 
     Returns:
         hurwitzint: n itself, or the hurwitzint equal to it (a float is truncated with int(), like everywhere else).
