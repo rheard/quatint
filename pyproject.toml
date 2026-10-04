@@ -18,7 +18,7 @@ authors = [
   { name="Ryan Heard", email="ryanwheard@gmail.com" },
 ]
 
-description = "A quatint class, for using quaternions backed by integers and half-integers (Hurwitz integers)."
+description = "A hurwitzint class, for using quaternions backed by integers and half-integers (Hurwitz integers)."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.10"
 classifiers = [
@@ -30,7 +30,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
-keywords = ["complex", "math"]
+keywords = ["quaternion", "hurwitz", "number theory", "complex", "math"]
 dependencies = [
     # Only the build needs sympy <= 1.12.1, for its py.typed (see [build-system] above). At runtime the compiled
     #   wheel calls into sympy like any other Python code, so any release with factorint and isprime would do, but
