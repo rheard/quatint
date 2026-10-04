@@ -128,6 +128,7 @@ ignore=[
     "multi-line-summary-first-line",    # Multi-line docstring summary should start at the first line
     "missing-terminal-punctuation",    # Closing punctuation on docstrings
     "pytest-incorrect-pytest-import",   # Incorrect import of pytest
+    "redundant-numeric-union",  # Use `float` instead of `int | float` (but mypyc compiles a float to a C double)
     "unsorted-dunder-slots",  # __slots__ is not sorted
     "non-empty-init-module",  # `__init__` module should only contain docstrings and re-exports
     "raise-vanilla-args",  # Avoid specifying long messages outside the exception class

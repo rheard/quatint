@@ -3,15 +3,11 @@ from __future__ import annotations
 from bisect import bisect_left
 from dataclasses import dataclass
 from math import gcd, prod
-from typing import ClassVar, Iterable, Iterator, Literal, TypeGuard, Union
+from typing import ClassVar, Iterable, Iterator, Literal, TypeGuard
 
 from sympy import factorint, isprime
 
-OTHER_OP_TYPES = int | float
-OP_TYPES = Union["hurwitzint", OTHER_OP_TYPES]
-
-
-def _is_number(x: object) -> TypeGuard[OTHER_OP_TYPES]:
+def _is_number(x: object) -> TypeGuard[int | float]:
     """
     Return whether x is an int or a float (so a bool too), the plain numbers that hurwitzint takes everywhere.
 
@@ -25,7 +21,7 @@ def _is_number(x: object) -> TypeGuard[OTHER_OP_TYPES]:
     return isinstance(x, int) or isinstance(x, float)  # ruff: ignore[duplicate-isinstance-call]
 
 
-def _part_to_int(x: OTHER_OP_TYPES) -> int:
+def _part_to_int(x: int | float) -> int:
     """
     Return int(x), for a part given to hurwitzint() that isn't a plain int: a float, truncated, or a bool.
 
@@ -493,10 +489,10 @@ class hurwitzint:
 
     def __init__(
         self,
-        a: OTHER_OP_TYPES = 0,
-        b: OTHER_OP_TYPES = 0,
-        c: OTHER_OP_TYPES = 0,
-        d: OTHER_OP_TYPES = 0,
+        a: int | float = 0,
+        b: int | float = 0,
+        c: int | float = 0,
+        d: int | float = 0,
         *,
         half: bool = False,
     ) -> None:
@@ -570,7 +566,7 @@ class hurwitzint:
         return hurwitzint(A, B, C, D, half=True)
 
     @classmethod
-    def _from_obj(cls, n: OP_TYPES) -> hurwitzint:
+    def _from_obj(cls, n: hurwitzint | int | float) -> hurwitzint:
         """Convert a random object to a hurwitzint"""
         if _is_number(n):
             # scalar n -> (2n + 0i + 0j + 0k)/2
@@ -596,7 +592,7 @@ class hurwitzint:
         """Quaternion conjugation: a+bi+cj+dk -> a-bi-cj-dk (in numerator units)."""
         return self._make(self._a, -self._b, -self._c, -self._d)
 
-    def __add__(self, other: OP_TYPES) -> hurwitzint:
+    def __add__(self, other: hurwitzint | int | float) -> hurwitzint:
         if isinstance(other, hurwitzint):
             return self._make(self._a + other._a, self._b + other._b, self._c + other._c, self._d + other._d)
 
@@ -608,10 +604,10 @@ class hurwitzint:
 
         return NotImplemented
 
-    def __radd__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __radd__(self, other: int | float) -> hurwitzint:
         return self.__add__(other)
 
-    def __sub__(self, other: OP_TYPES) -> hurwitzint:
+    def __sub__(self, other: hurwitzint | int | float) -> hurwitzint:
         if isinstance(other, hurwitzint):
             return self._make(self._a - other._a, self._b - other._b, self._c - other._c, self._d - other._d)
 
@@ -621,7 +617,7 @@ class hurwitzint:
 
         return NotImplemented
 
-    def __rsub__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __rsub__(self, other: int | float) -> hurwitzint:
         # other - self, without making -self first
         if _is_number(other):
             n = other if type(other) is int else int(other)
@@ -635,7 +631,7 @@ class hurwitzint:
     def __pos__(self) -> hurwitzint:
         return self._make(self._a, self._b, self._c, self._d)
 
-    def __mul__(self, other: OP_TYPES) -> hurwitzint:
+    def __mul__(self, other: hurwitzint | int | float) -> hurwitzint:
         if isinstance(other, hurwitzint):
             P, Q, R, S = _mul_numerators(self._a, self._b, self._c, self._d, other._a, other._b, other._c, other._d)
             return self._make(P, Q, R, S)
@@ -647,11 +643,11 @@ class hurwitzint:
 
         return NotImplemented
 
-    def __rmul__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __rmul__(self, other: int | float) -> hurwitzint:
         return self.__mul__(other)
 
     # Not just `exp: float`, since mypyc would turn an int exponent into a double and lose every bit past 2**53
-    def __pow__(self, exp: OTHER_OP_TYPES, mod: OP_TYPES | None = None) -> hurwitzint:
+    def __pow__(self, exp: int | float, mod: hurwitzint | int | float | None = None) -> hurwitzint:
         """
         Return self**exp, or for pow(self, exp, mod), self**exp modulo the integer mod.
 
@@ -732,7 +728,7 @@ class hurwitzint:
         return self._make(Qa, Qb, Qc, Qd), self._make(Ra, Rb, Rc, Rd)
 
     # region Left-division helpers (non-commutative!)
-    def __divmod__(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+    def __divmod__(self, other: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint]:
         """
         Nearest-lattice division in the Hurwitz quaternion order.
 
@@ -765,25 +761,25 @@ class hurwitzint:
         # q ~ self * conj(other) / N(other), the usual quaternion self / other (see _division)
         return self._division(other, n)
 
-    def __rdivmod__(self, other: OTHER_OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+    def __rdivmod__(self, other: int | float) -> tuple[hurwitzint, hurwitzint]:
         if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__divmod__(self)
 
         return NotImplemented
 
-    def __truediv__(self, other: OP_TYPES) -> hurwitzint:
+    def __truediv__(self, other: hurwitzint | int | float) -> hurwitzint:
         # mirror QuadInt: treat / as Euclidean division in this domain
         return self.__floordiv__(other)
 
-    def __rtruediv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __rtruediv__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__truediv__(self)
 
         return NotImplemented
 
-    def __floordiv__(self, other: OP_TYPES) -> hurwitzint:
+    def __floordiv__(self, other: hurwitzint | int | float) -> hurwitzint:
         # Not divmod(self, other), so an unsupported other gets its own __rfloordiv__ and a TypeError naming //
         qr = self.__divmod__(other)
         if qr is NotImplemented:
@@ -791,21 +787,21 @@ class hurwitzint:
 
         return qr[0]
 
-    def __rfloordiv__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __rfloordiv__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__floordiv__(self)
 
         return NotImplemented
 
-    def __mod__(self, other: OP_TYPES) -> hurwitzint:
+    def __mod__(self, other: hurwitzint | int | float) -> hurwitzint:
         qr = self.__divmod__(other)
         if qr is NotImplemented:
             return NotImplemented
 
         return qr[1]
 
-    def __rmod__(self, other: OTHER_OP_TYPES) -> hurwitzint:
+    def __rmod__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
             new_other = self._from_obj(other)
             return new_other.__mod__(self)
@@ -814,7 +810,7 @@ class hurwitzint:
     # endregion
 
     # region Right-division helpers
-    def rdivmod(self, other: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+    def rdivmod(self, other: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint]:
         """
         Right-quotient division in the Hurwitz quaternion order.
 
@@ -845,16 +841,16 @@ class hurwitzint:
         # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other) (see _division)
         return self._division(other, n, right=True)
 
-    def rtruediv(self, other: OP_TYPES) -> hurwitzint:
+    def rtruediv(self, other: hurwitzint | int | float) -> hurwitzint:
         """A version of __truediv__ for right-division"""
         return self.rfloordiv(other)
 
-    def rfloordiv(self, other: OP_TYPES) -> hurwitzint:
+    def rfloordiv(self, other: hurwitzint | int | float) -> hurwitzint:
         """A version of __floordiv__ for right-division"""
         q, _ = self.rdivmod(other)
         return q
 
-    def rmod(self, other: OP_TYPES) -> hurwitzint:
+    def rmod(self, other: hurwitzint | int | float) -> hurwitzint:
         """A version of __mod__ for right-division"""
         _, r = self.rdivmod(other)
         return r
@@ -905,7 +901,7 @@ class hurwitzint:
 
         return self._make(Qa, Qb, Qc, Qd)
 
-    def exact_div_right(self, other: OP_TYPES) -> hurwitzint | None:
+    def exact_div_right(self, other: hurwitzint | int | float) -> hurwitzint | None:
         """
         Return q if self == q * other exactly, else None.
 
@@ -919,7 +915,7 @@ class hurwitzint:
         """
         return self._exact_division(_to_hurwitzint(other, "exact_div_right"))
 
-    def exact_div_left(self, other: OP_TYPES) -> hurwitzint | None:
+    def exact_div_left(self, other: hurwitzint | int | float) -> hurwitzint | None:
         """
         Return q if self == other * q exactly, else None.
 
@@ -950,7 +946,7 @@ class hurwitzint:
 
         return dividend._exact_division(self, right=right) is not None
 
-    def divides_right(self, other: OP_TYPES) -> bool:
+    def divides_right(self, other: hurwitzint | int | float) -> bool:
         """
         Return True iff self is a right divisor of other: other == q * self for some Hurwitz integer q.
 
@@ -964,7 +960,7 @@ class hurwitzint:
         """
         return self._divides(_to_hurwitzint(other, "divides_right"))
 
-    def divides_left(self, other: OP_TYPES) -> bool:
+    def divides_left(self, other: hurwitzint | int | float) -> bool:
         """
         Return True iff self is a left divisor of other: other == self * q for some Hurwitz integer q.
 
@@ -1193,7 +1189,7 @@ class hurwitzint:
 
     # region GCD
     def _gcd(self,
-             other: OP_TYPES,
+             other: hurwitzint | int | float,
              *,
              right: bool = False) -> hurwitzint:
         """
@@ -1229,7 +1225,7 @@ class hurwitzint:
         return self._make(A, B, C, D)
 
     def _xgcd(self,
-              other: OP_TYPES,
+              other: hurwitzint | int | float,
               *,
               right: bool = False) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
         """
@@ -1275,7 +1271,7 @@ class hurwitzint:
         return self._make(A, B, C, D), self._make(sa, sb, sc, sd), self._make(ta, tb, tc, td)
 
     def gcd_right(self,
-                  other: OP_TYPES,
+                  other: hurwitzint | int | float,
                   *,
                   normalize: bool = True) -> hurwitzint:
         """
@@ -1297,7 +1293,7 @@ class hurwitzint:
         return g._canonical_associate(direction="left")[0] if normalize else g
 
     def gcd_left(self,
-                 other: OP_TYPES,
+                 other: hurwitzint | int | float,
                  *,
                  normalize: bool = True) -> hurwitzint:
         """
@@ -1319,7 +1315,7 @@ class hurwitzint:
         return g._canonical_associate(direction="right")[0] if normalize else g
 
     def xgcd_right(self,
-                   other: OP_TYPES,
+                   other: hurwitzint | int | float,
                    *,
                    normalize: bool = True) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
         """
@@ -1342,7 +1338,7 @@ class hurwitzint:
         return g, s, t
 
     def xgcd_left(self,
-                  other: OP_TYPES,
+                  other: hurwitzint | int | float,
                   *,
                   normalize: bool = True) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
         """
@@ -1367,7 +1363,7 @@ class hurwitzint:
 
     # region Modular arithmetic
     @staticmethod
-    def _modulus(mod: OP_TYPES, name: str) -> int:
+    def _modulus(mod: hurwitzint | int | float, name: str) -> int:
         """
         Return the positive integer that mod stands for, as the modulus of inv_mod or pow(x, e, mod).
 
@@ -1399,7 +1395,7 @@ class hurwitzint:
 
         return -m if m < 0 else m
 
-    def inv_mod(self, mod: OP_TYPES) -> hurwitzint:
+    def inv_mod(self, mod: hurwitzint | int | float) -> hurwitzint:
         """
         Return the inverse of self modulo the integer mod: the y with x*y and y*x both congruent to 1 modulo mod.
 
@@ -1541,7 +1537,7 @@ class hurwitzint:
         return self._make(Ba, Bb, Bc, Bd), best_u
 
     @classmethod
-    def prime_of_norm(cls, p: OTHER_OP_TYPES, *, direction: Literal["left", "right"] = "right") -> hurwitzint:
+    def prime_of_norm(cls, p: int | float, *, direction: Literal["left", "right"] = "right") -> hurwitzint:
         """
         Return a fixed Hurwitz prime whose norm is the rational prime p.
 
@@ -1742,7 +1738,7 @@ if not hurwitzint.UNITS:
     hurwitzint.UNITS = units()
 
 
-def _to_hurwitzint(n: OP_TYPES, name: str) -> hurwitzint:
+def _to_hurwitzint(n: hurwitzint | int | float, name: str) -> hurwitzint:
     """
     Return n as a hurwitzint, for the methods and module-level helpers that take a plain number in place of one.
 
@@ -1766,32 +1762,32 @@ def _to_hurwitzint(n: OP_TYPES, name: str) -> hurwitzint:
     return hurwitzint(n)
 
 
-def rdivmod(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint]:
+def rdivmod(a: hurwitzint | int | float, b: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint]:
     """Simply a helper method to match existing Python divmod syntax, for a.rdivmod(b), where a can be a number too"""
     return _to_hurwitzint(a, "rdivmod").rdivmod(b)
 
 
-def gcd_left(a: OP_TYPES, b: OP_TYPES) -> hurwitzint:
+def gcd_left(a: hurwitzint | int | float, b: hurwitzint | int | float) -> hurwitzint:
     """Simply a helper method to match existing Python gcd syntax, for a.gcd_left(b), where a can be a number too"""
     return _to_hurwitzint(a, "gcd_left").gcd_left(b)
 
 
-def gcd_right(a: OP_TYPES, b: OP_TYPES) -> hurwitzint:
+def gcd_right(a: hurwitzint | int | float, b: hurwitzint | int | float) -> hurwitzint:
     """Simply a helper method to match existing Python gcd syntax, for a.gcd_right(b), where a can be a number too"""
     return _to_hurwitzint(a, "gcd_right").gcd_right(b)
 
 
-def xgcd_left(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+def xgcd_left(a: hurwitzint | int | float, b: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
     """Simply a helper method to match gcd_left, for a.xgcd_left(b), where a can be a number too"""
     return _to_hurwitzint(a, "xgcd_left").xgcd_left(b)
 
 
-def xgcd_right(a: OP_TYPES, b: OP_TYPES) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
+def xgcd_right(a: hurwitzint | int | float, b: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint, hurwitzint]:
     """Simply a helper method to match gcd_right, for a.xgcd_right(b), where a can be a number too"""
     return _to_hurwitzint(a, "xgcd_right").xgcd_right(b)
 
 
-def prod_right(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
+def prod_right(x: Iterable[hurwitzint | int | float], start: hurwitzint | int | float | None = None):
     """Simply a helper method to match existing Python prod syntax"""
     if start is None:
         start = 1
@@ -1799,7 +1795,7 @@ def prod_right(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
     return prod(x, start=start)
 
 
-def prod_left(x: Iterable[OP_TYPES], start: OP_TYPES | None = None):
+def prod_left(x: Iterable[hurwitzint | int | float], start: hurwitzint | int | float | None = None):
     """Simply a helper method to match existing Python prod syntax"""
     if start is None:
         start = 1
