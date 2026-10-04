@@ -6,6 +6,7 @@ import os
 import pickle
 import random
 
+from decimal import Decimal
 from fractions import Fraction
 from itertools import product, starmap
 from math import floor, gcd, isqrt
@@ -276,6 +277,16 @@ class TestInit(HurwitzIntTests):
         assert list(hurwitzint()) == [0, 0, 0, 0]
         assert hurwitzint(5) == 5
         assert list(hurwitzint(5, -6)) == [10, -12, 0, 0]
+
+    def test_only_numbers(self):
+        """A part that isn't an int or float raises TypeError in both builds, even ones int() would take"""
+        for bad in ("1", Fraction(7, 2), Decimal(3), hurwitzint(5), complex(1, 0), None):
+            for parts in ((bad,), (1, bad), (1, 1, 1, bad)):
+                with pytest.raises(TypeError):
+                    hurwitzint(*parts)
+
+                with pytest.raises(TypeError):
+                    hurwitzint(*parts, half=True)
 
 
 class TestImmutable(HurwitzIntTests):

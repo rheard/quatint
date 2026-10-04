@@ -25,6 +25,24 @@ def _is_number(x: object) -> TypeGuard[OTHER_OP_TYPES]:
     return isinstance(x, int) or isinstance(x, float)  # ruff: ignore[duplicate-isinstance-call]
 
 
+def _part_to_int(x: OTHER_OP_TYPES) -> int:
+    """
+    Return int(x), for a part given to hurwitzint() that isn't a plain int: a float, truncated, or a bool.
+
+    Returns:
+        int: The part, as an int.
+
+    Raises:
+        TypeError: If x is not an int or float.
+    """
+    # The mypyc build rejects anything else before getting here, so this makes pure Python match it, rather than
+    #   int() a string, a Fraction or a real hurwitzint
+    if not _is_number(x):
+        raise TypeError(f"hurwitzint parts must be int or float, not {type(x).__name__!r}")
+
+    return int(x)
+
+
 @dataclass(frozen=True, slots=True)
 class NonCommutativeFactorization:
     """
@@ -456,7 +474,8 @@ class hurwitzint:
                 If half=True: interpreted as numerator components for /2:
                     q = (a + b*i + c*j + d*k) / 2
                 (So (1+i+j+k)/2 is hurwitzint(1,1,1,1, half=True).)
-                Floats are truncated with int(), like everywhere else a float meets a hurwitzint.
+                Floats are truncated with int(), like everywhere else a float meets a hurwitzint, and anything but
+                an int or float raises TypeError.
             b: See a.
             c: See a.
             d: See a.
@@ -468,10 +487,10 @@ class hurwitzint:
         """
         # This runs for the result of every operation (see _make), and under mypyc int() is slow on an argument
         #   that may also be a float, so plain ints skip it (type() rather than isinstance(), so bools become ints)
-        a0 = a if type(a) is int else int(a)
-        b0 = b if type(b) is int else int(b)
-        c0 = c if type(c) is int else int(c)
-        d0 = d if type(d) is int else int(d)
+        a0 = a if type(a) is int else _part_to_int(a)
+        b0 = b if type(b) is int else _part_to_int(b)
+        c0 = c if type(c) is int else _part_to_int(c)
+        d0 = d if type(d) is int else _part_to_int(d)
 
         if not half:
             a0 *= 2
