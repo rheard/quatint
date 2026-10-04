@@ -1010,23 +1010,15 @@ class hurwitzint:
         Reduced norm:
             N((A+Bi+Cj+Dk)/2) = (A^2+B^2+C^2+D^2)/4
 
-        Always an integer for valid Hurwitz integers.
+        That is always an integer, since __init__ only lets through four numerators of the same parity: four even
+            squares are each a multiple of 4, and four odd ones are each 1 more than one, so either way they add up to
+            a multiple of 4.
 
         Returns:
             int: The norm.
-
-        Raises:
-            ArithmeticError: If there is a non-integral norm due to parity violation.
         """
         num = _mul(self._a, self._a) + _mul(self._b, self._b) + _mul(self._c, self._c) + _mul(self._d, self._d)
-        # q, r = divmod(num, 4)   # Below is ever so slightly faster it seems, and this is an important operation
-        r = num & 3
-        q = num >> 2
-
-        if r != 0:
-            raise ArithmeticError("Non-integral norm; parity constraint violated")
-
-        return q
+        return num >> 2  # Exact (see above), and quicker than // 4
 
     @property
     def trace(self) -> int:
