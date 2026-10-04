@@ -954,9 +954,12 @@ class TestDiv(HurwitzIntTests):
             self.assert_equal(r, float(i) % self.b_int)
 
     def test_int_and_float_divisors(self):
-        """An int or float divisor divides like the hurwitzint it equals, and the same on either side"""
+        """
+        An int, float or bool divisor divides like the hurwitzint it makes (so a float is truncated), and the same on
+            either side
+        """
         for a in (self.a_int, hurwitzint(3, -5, 7, 9, half=True), hurwitzint(-17, 4, 0, 23)):
-            for m in (1, -1, 2, 3, -3, 7, 3.0, -2.0):
+            for m in (1, -1, 2, 3, -3, 7, 3.0, -2.0, 2.9, -2.9, True):
                 expected = divmod(a, hurwitzint(m))
 
                 assert divmod(a, m) == expected

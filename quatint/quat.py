@@ -740,9 +740,7 @@ class hurwitzint:
         """
         The division shared by __divmod__ and rdivmod: the nearest-lattice division of _divmod_numerators.
 
-        An integer divisor m takes a shortcut. It commutes with everything, so it leaves the same remainder from either
-            side, and that is the residue _residue_numerators works out part by part, with 8 products rather than 36.
-            The quotient is then (self - r) / m, exactly.
+        A real divisor takes the shortcut of _integer_division instead.
 
         Args:
             divisor: The divisor.
@@ -752,15 +750,34 @@ class hurwitzint:
         Returns:
             tuple: The quotient and remainder.
         """
-        A, B, C, D = self._a, self._b, self._c, self._d
         if not (divisor._b or divisor._c or divisor._d):
-            m = divisor._a // 2
-            Ra, Rb, Rc, Rd = _residue_numerators(A, B, C, D, -m if m < 0 else m)
-            return self._make((A - Ra) // m, (B - Rb) // m, (C - Rc) // m, (D - Rd) // m), self._make(Ra, Rb, Rc, Rd)
+            return self._integer_division(divisor._a // 2)
 
-        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, divisor._a, divisor._b, divisor._c, divisor._d,
+        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(self._a, self._b, self._c, self._d,
+                                                            divisor._a, divisor._b, divisor._c, divisor._d,
                                                             divisor_norm, right=right)
         return self._make(Qa, Qb, Qc, Qd), self._make(Ra, Rb, Rc, Rd)
+
+    def _integer_division(self, m: int) -> tuple[hurwitzint, hurwitzint]:
+        """
+        The division by an integer m, for _division with a real divisor, and for __divmod__ and rdivmod with a number.
+
+        m commutes with everything, so it leaves the same remainder from either side, and that is the residue
+            _residue_numerators works out part by part, with 8 products rather than 36. The quotient is then
+            (self - r) / m, exactly. A number never has to become a hurwitzint to get here.
+
+        Returns:
+            tuple: The quotient and remainder.
+
+        Raises:
+            ZeroDivisionError: If m is 0.
+        """
+        if m == 0:
+            raise ZeroDivisionError
+
+        A, B, C, D = self._a, self._b, self._c, self._d
+        Ra, Rb, Rc, Rd = _residue_numerators(A, B, C, D, -m if m < 0 else m)
+        return self._make((A - Ra) // m, (B - Rb) // m, (C - Rc) // m, (D - Rd) // m), self._make(Ra, Rb, Rc, Rd)
 
     # region Left-division helpers (non-commutative!)
     def __divmod__(self, other: hurwitzint | int | float) -> tuple[hurwitzint, hurwitzint]:
@@ -784,7 +801,8 @@ class hurwitzint:
             ZeroDivisionError: if other == 0
         """
         if _is_number(other):
-            other = hurwitzint(other)
+            # A number divides each part on its own, without becoming a hurwitzint (see _integer_division)
+            return self._integer_division(other if type(other) is int else int(other))
 
         if not isinstance(other, hurwitzint):
             return NotImplemented
@@ -860,7 +878,8 @@ class hurwitzint:
             ZeroDivisionError: If trying to divide by 0.
         """
         if _is_number(other):
-            other = hurwitzint(other)
+            # An integer leaves the same quotient and remainder on either side (see _integer_division)
+            return self._integer_division(other if type(other) is int else int(other))
 
         if not isinstance(other, hurwitzint):
             raise TypeError(f"unsupported type for rdivmod: {type(other).__name__!r}")
