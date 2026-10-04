@@ -457,18 +457,6 @@ def _factorint(n: int) -> dict[int, int]:
     return {int(p): int(e) for p, e in factorint(n).items()}
 
 
-def _from_numerators(A: int, B: int, C: int, D: int) -> hurwitzint:
-    """
-    Return the hurwitzint (A + B*i + C*j + D*k) / 2, which is how an unpickled one is rebuilt (see __reduce__).
-
-    Pickles refer to this function by name, so renaming or removing it would break every pickle made before.
-
-    Returns:
-        hurwitzint: The value.
-    """
-    return hurwitzint(A, B, C, D, half=True)
-
-
 class hurwitzint:
     """
     Hurwitz quaternion integer.
@@ -569,7 +557,7 @@ class hurwitzint:
     # region constructors / conversions
     @staticmethod
     def _make(A: int, B: int, C: int, D: int) -> hurwitzint:
-        """Construct a hurwitzint from its numerators, as every arithmetic result is."""
+        """Construct a hurwitzint from its numerators, as every arithmetic result (and every unpickled one) is."""
         # By the class's own name, mypyc calls the native constructor directly. Through cls it was a generic Python
         #   call, which parsed the arguments (matching half up by name) before getting there, and that was about half
         #   of what a + b cost. A compiled hurwitzint can't be subclassed anyway.
@@ -1102,8 +1090,9 @@ class hurwitzint:
 
     def __reduce__(self) -> tuple:
         # Pickle as the numerators. Without this, pickling only works at protocol 2 and up: at 0 and 1, copyreg can
-        #   rebuild neither a class with __slots__ (pure Python) nor a mypyc native class
-        return _from_numerators, (self._a, self._b, self._c, self._d)
+        #   rebuild neither a class with __slots__ (pure Python) nor a mypyc native class.
+        # Every pickle names hurwitzint._make, so renaming it after a release would break the pickles saved before
+        return hurwitzint._make, (self._a, self._b, self._c, self._d)
 
     def __repr__(self) -> str:
         if self.is_lipschitz:
