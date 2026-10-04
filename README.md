@@ -81,6 +81,9 @@ q, r = divmod(a, b)
 assert q * b + r == a
 ```
 
+The remainder is the one of least norm (at most half of `abs(b)`), and when several quotients leave that, the one with the largest numerator tuple.
+    So it only depends on `a` modulo the multiples of `b`: `a % b == (a + h * b) % b` for any Hurwitz integer `h`.
+
 ### Right-division (right-quotient)
 
 Use `rdivmod` (method or helper) to define quotient on the **right**:
@@ -200,8 +203,7 @@ assert pow(x, -1, 7) == x.inv_mod(7)
 ```
 
 For both, the modulus has to be an integer (or a real `hurwitzint`), since only an integer's multiples are the same from either side.
-    The result is the canonical residue of its class: the element of least norm, with ties going to the largest numerator tuple, so congruent values always give the very same result, and `pow(x, 1, m)` reduces `x` itself.
-    `x % m` is the Euclidean remainder, which can only differ from that when `x / m` lies exactly between Hurwitz integers, where `%` breaks the tie its own way.
+    The result is reduced with `%`, so `pow(x, e, m) == (x ** e) % m`, as for an `int`, and congruent values always give the very same result.
 
 ### Primes of a given norm
 

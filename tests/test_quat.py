@@ -116,53 +116,30 @@ class HurwitzIntTests:
                 return x
 
     @staticmethod
-    def smallest_remainder_norm(a: hurwitzint, b: hurwitzint, *, right: bool = False) -> int:
+    def canonical_remainder(a: hurwitzint, b: hurwitzint, *, right: bool = False) -> hurwitzint:
         """
-        Brute-force the smallest N(r) that any Hurwitz quotient q can leave, in a = q*b + r (or a = b*q + r).
+        Brute-force the remainder division should leave in a = q*b + r (or a = b*q + r): of every r a Hurwitz
+            quotient q can leave, the one of least norm, and of those, the one with the largest numerator tuple.
 
-        In numerator units the exact quotient is U/n, where n = N(b) and U = a*conj(b) (or conj(b)*a). The nearest
+        In numerator units the exact quotient is U/n, where n = N(b) and U = a*conj(b) (or conj(b)*a). A nearest
             Hurwitz integer has, in every part, one of the two even integers around U_i/n, or else one of the two odd
-            ones around it, so trying all 2 * 2**4 of those is sure to include it.
+            ones around it, so trying all 2 * 2**4 of those is sure to include every remainder of least norm.
 
         Returns:
-            int: The smallest possible remainder norm.
+            hurwitzint: The remainder.
         """
         n = abs(b)
         U = list(b.conjugate() * a) if right else list(a * b.conjugate())
 
-        smallest = None
+        remainders = []
         for parity in (0, 1):
             # The largest integer of this parity that is <= U_i/n, and so the one 2 above it is > U_i/n
             lows = [u // n - ((u // n - parity) & 1) for u in U]
             for s0, s1, s2, s3 in product((0, 2), repeat=4):
                 q = hurwitzint(lows[0] + s0, lows[1] + s1, lows[2] + s2, lows[3] + s3, half=True)
-                r = a - b * q if right else a - q * b
-                if smallest is None or abs(r) < smallest:
-                    smallest = abs(r)
+                remainders.append(a - b * q if right else a - q * b)
 
-        assert smallest is not None
-        return smallest
-
-    @staticmethod
-    def brute_residue(x: hurwitzint, m: int) -> hurwitzint:
-        """
-        Brute-force the canonical residue of x modulo the integer m > 0: of every x - m*q, the one of least norm, and
-            of those, the one with the largest numerator tuple.
-
-        Like smallest_remainder_norm: in every part, q's numerator is one of the two integers of its parity around
-            x's numerator over m, so trying all 2 * 2**4 of those is sure to include every remainder of least norm.
-
-        Returns:
-            hurwitzint: The residue.
-        """
-        candidates = []
-        for parity in (0, 1):
-            lows = [n // m - ((n // m - parity) & 1) for n in x]
-            for steps in product((0, 2), repeat=4):
-                q = hurwitzint(*(low + step for low, step in zip(lows, steps, strict=True)), half=True)
-                candidates.append(x - m * q)
-
-        return min(candidates, key=lambda r: (abs(r), [-n for n in r]))
+        return min(remainders, key=lambda r: (abs(r), [-part for part in r]))
 
 
 class TestEq(HurwitzIntTests):
@@ -819,8 +796,11 @@ class TestDiv(HurwitzIntTests):
                 assert q * b + r == a
                 assert 2 * abs(r) <= abs(b)
 
-    def test_random_remainder_is_smallest(self):
-        """For random pairs of every size, the remainder is as small as any Hurwitz quotient could make it"""
+    def test_random_remainder_is_canonical(self):
+        """
+        For random pairs of every size, the remainder is as small as any Hurwitz quotient could make it, and of those
+            that small, the one with the largest numerator tuple
+        """
         rng = random.Random(1_000)
         for bound_a, bound_b in ((10, 3), (10, 10**4), (10**4, 10**2), (10**12, 10**5), (10**30, 10**12)):
             for _ in range(150):
@@ -830,7 +810,30 @@ class TestDiv(HurwitzIntTests):
 
                 assert q * b + r == a
                 assert 2 * abs(r) <= abs(b)
-                assert abs(r) == self.smallest_remainder_norm(a, b)
+                assert r == self.canonical_remainder(a, b)
+
+    def test_small_remainders_are_canonical(self):
+        """Among small values, where several quotients often leave the least norm, the remainder is still canonical"""
+        rng = random.Random(1_001)
+        values = list(self.wide_search_values(2))
+        for b in self.division_divisors:
+            for a in rng.sample(values, 60):
+                assert a % b == self.canonical_remainder(a, b)
+
+    def test_remainder_depends_only_on_class(self):
+        """
+        Values congruent modulo the left multiples of b leave the same remainder, and so do the divisors with the same
+            left multiples (u*b for a unit u), even where several quotients tie, as they often do for small values
+        """
+        shifts = (hurwitzint(1), hurwitzint(0, -1, 0, 0), hurwitzint(1, -1, 1, 1, half=True))
+        j = hurwitzint(0, 0, 1, 0)
+        for b in self.division_divisors:
+            for a in self.wide_search_values(2):
+                r = a % b
+                for h in shifts:
+                    assert (a + h * b) % b == r
+
+                assert a % (j * b) == r
 
     def test_exact_multiples_divide_exactly(self):
         """Dividing q*b by b gives back exactly q with no remainder, for random q and b of every size"""
@@ -966,8 +969,8 @@ class TestRDiv(HurwitzIntTests):
                 assert b * q + r == a
                 assert 2 * abs(r) <= abs(b)
 
-    def test_random_remainder_is_smallest(self):
-        """The right-division version of TestDiv.test_random_remainder_is_smallest"""
+    def test_random_remainder_is_canonical(self):
+        """The right-division version of TestDiv.test_random_remainder_is_canonical"""
         rng = random.Random(3_000)
         for bound_a, bound_b in ((10, 3), (10, 10**4), (10**4, 10**2), (10**12, 10**5), (10**30, 10**12)):
             for _ in range(150):
@@ -977,7 +980,30 @@ class TestRDiv(HurwitzIntTests):
 
                 assert b * q + r == a
                 assert 2 * abs(r) <= abs(b)
-                assert abs(r) == self.smallest_remainder_norm(a, b, right=True)
+                assert r == self.canonical_remainder(a, b, right=True)
+
+    def test_small_remainders_are_canonical(self):
+        """The right-division version of TestDiv.test_small_remainders_are_canonical"""
+        rng = random.Random(3_001)
+        values = list(self.wide_search_values(2))
+        for b in self.division_divisors:
+            for a in rng.sample(values, 60):
+                assert a.rmod(b) == self.canonical_remainder(a, b, right=True)
+
+    def test_remainder_depends_only_on_class(self):
+        """
+        The right-division version of TestDiv.test_remainder_depends_only_on_class: values congruent modulo the right
+            multiples of b, and divisors with the same right multiples (b*u for a unit u), leave the same remainder
+        """
+        shifts = (hurwitzint(1), hurwitzint(0, -1, 0, 0), hurwitzint(1, -1, 1, 1, half=True))
+        j = hurwitzint(0, 0, 1, 0)
+        for b in self.division_divisors:
+            for a in self.wide_search_values(2):
+                r = a.rmod(b)
+                for h in shifts:
+                    assert (a + b * h).rmod(b) == r
+
+                assert a.rmod(b * j) == r
 
     def test_exact_multiples_divide_exactly(self):
         """Right-dividing b*q by b gives back exactly q with no remainder, for random q and b of every size"""
@@ -1223,24 +1249,27 @@ class TestDivides(HurwitzIntTests):
                     method(other)
 
 
-class TestRoundDivTiesAwayFromZero:
-    """Tests for _round_div_ties_away_from_zero, the rounding that every division starts from"""
+class TestNearestByParity:
+    """Tests for _nearest_by_parity, which every division starts from"""
 
     def test_matches_exact_rounding(self):
-        """a/b rounds to the nearest integer, with exact halves going away from zero, for small and big values"""
-        values = (*range(-60, 61), 10**30 + 5, -(10**30) - 5, 2**64 + 1, -(2**64) - 1)
-        for b in (*range(1, 13), 2**64):
-            for a in values:
-                x = Fraction(a, b)
-                nearest = floor(abs(x) + Fraction(1, 2))
+        """
+        For small and big values, each parity's integer is the one nearest u/n, at the distance given (times n), the
+            smaller one when two are as near, and a distance of n means exactly that tie
+        """
+        values = (*range(-60, 61), 10**30 + 5, -(10**30) - 5, 2**64 + 1, -(2**64) - 1, 2**64, -(2**64))
+        for n in (*range(1, 13), 2**64):
+            for u in values:
+                t = Fraction(u, n)
+                even, even_distance, odd, odd_distance = quatint.quat._nearest_by_parity(u, n)
+                for q, distance, parity in ((even, even_distance, 0), (odd, odd_distance, 1)):
+                    # The integers of this parity on either side of t, with the smaller one on a tie
+                    below = floor(t) - (floor(t) - parity) % 2
+                    nearest = min((below, below + 2), key=lambda c, t=t: (abs(t - c), c))
 
-                assert quatint.quat._round_div_ties_away_from_zero(a, b) == (nearest if x >= 0 else -nearest)
-
-    def test_divisor_must_be_positive(self):
-        """The divisor b has to be positive (it is always a norm), and anything else raises ValueError"""
-        for b in (0, -1, -7):
-            with pytest.raises(ValueError, match="b must be > 0"):
-                quatint.quat._round_div_ties_away_from_zero(5, b)
+                    assert q == nearest
+                    assert distance == abs(u - n * q)
+                    assert (distance == n) == (t == below + 1)
 
 
 class TestMulHelper:
@@ -1877,11 +1906,11 @@ class TestModuleLevelHelpers(HurwitzIntTests):
 
 
 class TestResidue(HurwitzIntTests):
-    """Tests for _residue_numerators, the canonical residue that inv_mod reduces to"""
+    """Tests for _residue_numerators, x % m worked out directly for an integer m, which inv_mod and pow reduce with"""
 
     @staticmethod
     def residue(x: hurwitzint, m: int) -> hurwitzint:
-        """The canonical residue of x modulo m > 0, from _residue_numerators"""
+        """The remainder of x modulo m > 0, from _residue_numerators"""
         return hurwitzint(*quatint.quat._residue_numerators(*x, m), half=True)
 
     def test_matches_brute_force(self):
@@ -1891,21 +1920,38 @@ class TestResidue(HurwitzIntTests):
         """
         for m in (2, 3, 4):
             for x in self.wide_search_values(2):
-                assert self.residue(x, m) == self.brute_residue(x, m)
+                assert self.residue(x, m) == self.canonical_remainder(x, hurwitzint(m))
 
         rng = random.Random(17_000)
         for bound in (10, 10**4, 10**30):
             for _ in range(30):
                 x = self.rand_hurwitzint(rng, bound)
                 for m in (1, 5, 6, 7, 12, 97, 10**9 + 7, 2**64):
-                    assert self.residue(x, m) == self.brute_residue(x, m)
+                    assert self.residue(x, m) == self.canonical_remainder(x, hurwitzint(m))
+
+    def test_matches_division(self):
+        """
+        It is the very remainder that division by m leaves, on either side, and dividing by -m too, so it is what
+            x % m gives, and pow(x, 1, m) == x % m. For every small value modulo small m (where ties are common), and
+            random values of every size modulo bigger ones
+        """
+        for m in (1, 2, 3, 4, 6, 7):
+            for x in self.wide_search_values(2):
+                r = self.residue(x, m)
+                assert x % m == x.rmod(m) == x % -m == pow(x, 1, m) == r
+
+        rng = random.Random(17_002)
+        for bound in (10, 10**4, 10**30):
+            for _ in range(30):
+                x = self.rand_hurwitzint(rng, bound)
+                for m in (5, 12, 97, 10**9 + 7, 2**64):
+                    assert x % m == x.rmod(m) == self.residue(x, m)
 
     def test_congruent_values(self):
-        """Values congruent modulo m have the very same residue, though x % m can differ between them"""
+        """Values congruent modulo m have the very same residue"""
         rng = random.Random(17_001)
         shifts = (hurwitzint(1), hurwitzint(-1), hurwitzint(0, 1, 0, 0), hurwitzint(1, 1, 1, 1, half=True),
                   hurwitzint(-1, 1, -1, 1, half=True))
-        remainders_differ = 0
         for _ in range(100):
             x = self.rand_hurwitzint(rng, 10)
             m = rng.choice((2, 3, 4, 6))
@@ -1913,9 +1959,6 @@ class TestResidue(HurwitzIntTests):
             assert hurwitzint(m).divides_right(x - r)
             for h in shifts:
                 assert self.residue(x + m * h, m) == r
-                remainders_differ += (x + m * h) % m != x % m
-
-        assert remainders_differ > 0  # Otherwise this would test nothing that % doesn't do already
 
 
 class TestInvMod(HurwitzIntTests):
@@ -1956,7 +1999,7 @@ class TestInvMod(HurwitzIntTests):
                 y = x.inv_mod(m)
                 assert hurwitzint(m).divides_right(x * y - 1)
                 assert hurwitzint(m).divides_right(y * x - 1)
-                assert y == self.brute_residue(y, m)
+                assert y == y % m  # Reduced already
 
         assert invertible > 100
 
@@ -1971,7 +2014,7 @@ class TestInvMod(HurwitzIntTests):
 
             # conj(x) / N(x) is the inverse, so conj(x) times the inverse of N(x) mod m is an inverse mod m
             y = x.inv_mod(m)
-            assert y == self.brute_residue(x.conjugate() * pow(abs(x), -1, m), m)
+            assert y == (x.conjugate() * pow(abs(x), -1, m)) % m
             for h in (hurwitzint(1), hurwitzint(1, 1, 1, 1, half=True), self.rand_hurwitzint(rng, 10)):
                 assert (x + m * h).inv_mod(m) == y
 
@@ -2019,17 +2062,17 @@ class TestPowMod(HurwitzIntTests):
         assert pow(hurwitzint(1, 1, 0, 0), 2, 3) == hurwitzint(0, -1, 0, 0)
 
     def test_matches_reducing_the_power(self):
-        """pow(x, e, m) is the canonical residue of x**e itself, for random x, e and m"""
+        """pow(x, e, m) == (x**e) % m, as for an int, for random x, e and m"""
         rng = random.Random(18_000)
         for bound in (3, 10**4, 10**12):
             for _ in range(40):
                 x = self.rand_hurwitzint(rng, bound)
                 e = rng.randint(0, 12)
                 m = rng.choice((1, 2, 3, 4, 6, 7, 10, 97, 10**9 + 7))
-                assert pow(x, e, m) == self.brute_residue(x**e, m)
+                assert pow(x, e, m) == (x**e) % m
 
     def test_congruent_bases(self):
-        """Congruent bases have the very same powers, which (x**e) % m doesn't promise"""
+        """Congruent bases have the very same powers"""
         rng = random.Random(18_001)
         for _ in range(60):
             x = self.rand_hurwitzint(rng, 10)

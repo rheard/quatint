@@ -179,42 +179,30 @@ def _mul(x: int, y: int) -> int:
     return x * y
 
 
-def _round_div_ties_away_from_zero(a: int, b: int) -> int:
-    """Round a/b to nearest integer; ties go away from zero. b must be > 0."""
-    if b <= 0:
-        raise ValueError("b must be > 0")
-
-    if a >= 0:
-        return (a + (b // 2)) // b
-
-    # a < 0
-    return -((-a + (b // 2)) // b)
-
-
-def _nearest_with_parity(U: int, Q0: int, parity: int, n: int) -> tuple[int, int]:
+def _nearest_by_parity(U: int, n: int) -> tuple[int, int, int, int]:
     """
-    Return (Q, metric) minimizing (Q*n - U)^2 subject to Q % 2 == parity,
-    given Q0, the nearest integer to U/n.
+    Return the even integer nearest U/n with its distance from U/n, then the odd one with its distance (n > 0).
+
+    The distances are in units of 1/n, so they are the integers |U - n*Q|. With fl = U // n, U/n lies in [fl, fl + 1),
+        so the nearest integer of fl's parity is fl itself, and the nearest of the other parity is fl + 1, except when
+        U/n == fl exactly: then fl - 1 is just as near, both n away. That is the only way two can tie, so a distance of
+        n always means a tie, and then this returns the smaller one, fl - 1.
 
     Returns:
-        tuple: The (Q, metric).
+        tuple: (even integer, its distance, odd integer, its distance).
     """
-    if parity == (Q0 & 1):
-        d = _mul(Q0, n) - U
-        return Q0, _mul(d, d)
+    fl = U // n
+    rem = U - _mul(fl, n)
+    if fl & 1:
+        if rem:
+            return fl + 1, n - rem, fl, rem
 
-    # Nearest integer with opposite parity must be Q0-1 or Q0+1.
-    Qm = Q0 - 1
-    Qp = Q0 + 1
-    dm = _mul(Qm, n) - U
-    dp = _mul(Qp, n) - U
-    mm = _mul(dm, dm)
-    mp = _mul(dp, dp)
+        return fl - 1, n, fl, 0
 
-    # Deterministic tie-break: prefer the smaller Q (Qm) on equal metric.
-    if mm <= mp:
-        return Qm, mm
-    return Qp, mp
+    if rem:
+        return fl, rem, fl + 1, n - rem
+
+    return fl, 0, fl - 1, n
 
 
 def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int) -> tuple[int, int, int, int]:
@@ -234,17 +222,25 @@ def _mul_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: i
             (_mul(A, H) + _mul(B, G) - _mul(C, F) + _mul(D, E)) // 2)
 
 
-def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int, n: int, *, right: bool) \
-        -> tuple[int, int, int, int, int, int, int, int]:
+def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H: int, n: int,
+                       *,
+                       right: bool,
+                       canonical: bool = True) -> tuple[int, int, int, int, int, int, int, int]:
     """
     Nearest-lattice division of x = (A+Bi+Cj+Dk)/2 by y = (E+Fi+Gj+Hk)/2 (with n = N(y) > 0), all as numerators.
 
-    Chooses q in the Hurwitz parity lattice (all components same parity) minimizing
-        sum_i (Qi*n - Ui)^2
-    where U holds the numerators of x * conj(y). Since x / y = x * conj(y) / N(y), each U_i / n is a numerator
-    of the exact quotient. (For right-division U holds conj(y) * x instead, for y^-1 * x.)
+    Chooses the Hurwitz integer q that leaves the remainder r = x - q*y (or x - y*q if right) of least norm. With U the
+        numerators of x * conj(y) (or conj(y) * x if right), r * conj(y) == x * conj(y) - n*q, so that means minimizing
+            sum_i (Ui - n*Qi)^2
+        over numerators Qi that share one parity. Each parity's parts are independent, so _nearest_by_parity picks
+        each one, and the parity with the smaller sum wins.
 
-    This can be done by comparing only 2 candidates: the best all-even q vs best all-odd q.
+    When several q leave a remainder of that least norm, this takes the one whose remainder has the largest numerator
+        tuple (see _tied_division). That only depends on the remainders, which are the same for every x
+        congruent modulo the multiples of y (x + h*y has the same ones, from q + h), so x % y is the same for all of
+        them too. For an integer y, that makes x % y the canonical residue that pow(x, e, y) and inv_mod give.
+        With canonical=False it takes any of them, for the gcds: Euclid's algorithm only needs a remainder that small,
+        and ties are common in the small divisions near its end, which factorization runs a lot of.
 
     This is the hot path under division, every gcd and every factorization step, so it works on plain ints: under
         mypyc a hurwitzint for each intermediate value costs more than the arithmetic does. For the same reason it
@@ -259,33 +255,31 @@ def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H
     else:
         Ua, Ub, Uc, Ud = _mul_numerators(A, B, C, D, E, -F, -G, -H)
 
-    # Unconstrained nearest integers to U_i / n (ties away from zero).
-    A0 = _round_div_ties_away_from_zero(Ua, n)
-    B0 = _round_div_ties_away_from_zero(Ub, n)
-    C0 = _round_div_ties_away_from_zero(Uc, n)
-    D0 = _round_div_ties_away_from_zero(Ud, n)
+    Ea, dEa, Oa, dOa = _nearest_by_parity(Ua, n)
+    Eb, dEb, Ob, dOb = _nearest_by_parity(Ub, n)
+    Ec, dEc, Oc, dOc = _nearest_by_parity(Uc, n)
+    Ed, dEd, Od, dOd = _nearest_by_parity(Ud, n)
 
-    if (((A0 ^ B0) & 1) == 0) and (((A0 ^ C0) & 1) == 0) and (((A0 ^ D0) & 1) == 0):
-        # Fast path: already in the Hurwitz parity lattice.
-        Qa, Qb, Qc, Qd = A0, B0, C0, D0
+    # The even quotient leaves 4n*N(r) == sum(d^2) over its distances d, and the odd one sum((n - d)^2), since each
+    #   part's two distances add up to n. Their difference is 2n * (2n - sum(d)), so the even one leaves the smaller
+    #   remainder exactly when its distances add up to less than 2n, and the two tie at 2n
+    two_n = n + n
+    even_sum = dEa + dEb + dEc + dEd
+
+    # A distance of n is a part with two nearest numerators (see _nearest_by_parity), so when the parity that wins
+    #   outright has none, its quotient is the only one of least norm
+    if even_sum < two_n and dEa != n and dEb != n and dEc != n and dEd != n:
+        Qa, Qb, Qc, Qd = Ea, Eb, Ec, Ed
+    elif even_sum > two_n and dOa != n and dOb != n and dOc != n and dOd != n:
+        Qa, Qb, Qc, Qd = Oa, Ob, Oc, Od
+    elif not canonical:
+        # A tie, where any quotient of least norm will do
+        Qa, Qb, Qc, Qd = (Ea, Eb, Ec, Ed) if even_sum <= two_n else (Oa, Ob, Oc, Od)
     else:
-        # Compare best all-even vs best all-odd. The metric is a sum over the components,
-        #   so each candidate is just the nearest integer of its parity, one component at a time.
-        Ae, mAe = _nearest_with_parity(Ua, A0, 0, n)
-        Be, mBe = _nearest_with_parity(Ub, B0, 0, n)
-        Ce, mCe = _nearest_with_parity(Uc, C0, 0, n)
-        De, mDe = _nearest_with_parity(Ud, D0, 0, n)
-
-        Ao, mAo = _nearest_with_parity(Ua, A0, 1, n)
-        Bo, mBo = _nearest_with_parity(Ub, B0, 1, n)
-        Co, mCo = _nearest_with_parity(Uc, C0, 1, n)
-        Do, mDo = _nearest_with_parity(Ud, D0, 1, n)
-
-        # Deterministic tie-break if equal metric: prefer even.
-        if mAe + mBe + mCe + mDe <= mAo + mBo + mCo + mDo:
-            Qa, Qb, Qc, Qd = Ae, Be, Ce, De
-        else:
-            Qa, Qb, Qc, Qd = Ao, Bo, Co, Do
+        # A tie, where picking the remainder takes more work, which _tied_division does (giving the remainder too)
+        return _tied_division((A, B, C, D), (E, F, G, H), (Ea, Eb, Ec, Ed), (dEa, dEb, dEc, dEd),
+                              (Oa, Ob, Oc, Od), (dOa, dOb, dOc, dOd), n,
+                              use_even=even_sum <= two_n, use_odd=even_sum >= two_n, right=right)
 
     # The remainder is x - q*y (or x - y*q)
     if right:
@@ -296,6 +290,73 @@ def _divmod_numerators(A: int, B: int, C: int, D: int, E: int, F: int, G: int, H
     return Qa, Qb, Qc, Qd, A - Pa, B - Pb, C - Pc, D - Pd
 
 
+def _tied_division(x: tuple[int, int, int, int],
+                   y: tuple[int, int, int, int],
+                   even: tuple[int, int, int, int],
+                   even_distances: tuple[int, int, int, int],
+                   odd: tuple[int, int, int, int],
+                   odd_distances: tuple[int, int, int, int],
+                   n: int,
+                   *,
+                   use_even: bool,
+                   use_odd: bool,
+                   right: bool) -> tuple[int, int, int, int, int, int, int, int]:
+    """
+    Finish _divmod_numerators when several quotients leave a remainder of the least norm, by taking the one whose
+        remainder has the largest numerator tuple, as _canonical_associate takes the largest associate.
+
+    It has to be a rule about the remainder for x % y to be the same for every x congruent modulo the multiples of y:
+        x + h*y shifts every quotient by h, and leaves the remainders as they were.
+
+    The candidates are the quotient of each parity that leaves the least norm (use_even and use_odd), from
+        _nearest_by_parity, where each part that ties (its distance is n) takes either nearest numerator: the one given,
+        or the one 2 above.
+
+    Returns:
+        tuple: The numerators of the quotient, then those of its remainder.
+    """
+    found = False
+    Qa = Qb = Qc = Qd = Ra = Rb = Rc = Rd = 0
+    for parity in range(2):  # Not over (0, 1), which mypyc iterates as a generic Python object
+        if not (use_odd if parity else use_even):
+            continue
+
+        qa, qb, qc, qd = odd if parity else even
+        da, db, dc, dd = odd_distances if parity else even_distances
+
+        # The parts that tie, as bits, and then every subset of them (each mask, from all of them down to none, moves
+        #   its parts to their other nearest numerator, 2 above)
+        tied = (1 if da == n else 0) | (2 if db == n else 0) | (4 if dc == n else 0) | (8 if dd == n else 0)
+        mask = tied
+        while True:
+            q = (qa + 2 * (mask & 1), qb + (mask & 2), qc + ((mask & 4) >> 1), qd + ((mask & 8) >> 2))
+            ra, rb, rc, rd = _sub_mul_numerators(x, q, y, right=right)
+
+            # One part at a time, since mypyc compiles a tuple comparison into a slow generic one
+            if not found:
+                larger = True
+            elif ra != Ra:
+                larger = ra > Ra
+            elif rb != Rb:
+                larger = rb > Rb
+            elif rc != Rc:
+                larger = rc > Rc
+            else:
+                larger = rd > Rd
+
+            if larger:
+                found = True
+                Qa, Qb, Qc, Qd = q
+                Ra, Rb, Rc, Rd = ra, rb, rc, rd
+
+            if not mask:
+                break
+
+            mask = (mask - 1) & tied
+
+    return Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd
+
+
 def _sub_mul_numerators(x: tuple[int, int, int, int],
                         q: tuple[int, int, int, int],
                         y: tuple[int, int, int, int],
@@ -304,7 +365,8 @@ def _sub_mul_numerators(x: tuple[int, int, int, int],
     """
     Return x - q*y (or x - y*q if right), with each Hurwitz integer given as its numerators, like _mul_numerators.
 
-    This steps the Bezout coefficients of the extended gcd along with its remainders (see hurwitzint._xgcd).
+    This works out the remainders of tied quotients (see _tied_division), and steps the Bezout
+        coefficients of the extended gcd along with its remainders (see hurwitzint._xgcd).
 
     Returns:
         tuple: The numerators of the result, over 2.
@@ -320,51 +382,31 @@ def _sub_mul_numerators(x: tuple[int, int, int, int],
     return xa - Pa, xb - Pb, xc - Pc, xd - Pd
 
 
-def _residue_part(A: int, m: int, parity: int) -> int:
-    """
-    Return A - m*Q for the Q of the given parity nearest A/m (with m > 0), taking the smaller Q on a tie.
-
-    The two integers of that parity around A/m are lo <= A/m < lo + 2, which leave A - m*lo in [0, 2m), or 2m less.
-        The nearer one leaves the smaller of those, and on a tie (A - m*lo == m) the smaller Q leaves the larger, +m.
-        So the result is in (-m, m].
-
-    Returns:
-        int: A - m*Q.
-    """
-    lo = A // m
-    if (lo - parity) & 1:
-        lo -= 1
-
-    r = A - _mul(m, lo)
-    return r if r <= m else r - 2 * m
-
-
 def _residue_numerators(A: int, B: int, C: int, D: int, m: int) -> tuple[int, int, int, int]:
     """
-    Return the canonical residue of x = (A+Bi+Cj+Dk)/2 modulo the integer m > 0, as numerators.
+    Return x % m for x = (A+Bi+Cj+Dk)/2 and an integer m > 0, as numerators, for inv_mod and pow(x, e, m).
 
-    That is the x - m*q (q a Hurwitz integer) of least norm, with ties going to the largest numerator tuple, like
-        _canonical_associate. It depends only on x's residue class modulo m, so congruent values reduce to the same
-        residue. x % m doesn't promise that: its quotient breaks ties with fixed rules (like rounding halves away from
-        zero), so when x / m lies exactly between Hurwitz integers, its remainder depends on which x it started from.
-
-    In numerators, the remainder's parts are A - m*Qa and so on, where q's numerators Qa..Qd share one parity. For each
-        parity the parts are independent, so _residue_part picks each one, taking the larger part on a tie. Then the
-        smaller sum of squares wins, and on a tie the larger tuple, which the first parts decide, since they always
-        differ (by m times an odd number).
+    That is the remainder _divmod_numerators leaves (the one of least norm, with ties going to the largest numerator
+        tuple), worked out with much less arithmetic, since the divisor is an integer. Then the remainder's parts are
+        just A - m*Qa and so on, so in each part, the tie between two nearest numerators goes to the smaller one, which
+        _nearest_by_parity gives, and a tie between the parities to the smaller first numerator. (The first parts
+        always differ, by m times an odd number.) Which parity leaves the smaller remainder comes from the sum of the
+        even distances, as in _divmod_numerators.
 
     Returns:
-        tuple: The residue's numerators, over 2.
+        tuple: The remainder's numerators, over 2.
     """
-    Ea, Eb, Ec, Ed = _residue_part(A, m, 0), _residue_part(B, m, 0), _residue_part(C, m, 0), _residue_part(D, m, 0)
-    Oa, Ob, Oc, Od = _residue_part(A, m, 1), _residue_part(B, m, 1), _residue_part(C, m, 1), _residue_part(D, m, 1)
+    Ea, dEa, Oa, _ = _nearest_by_parity(A, m)
+    Eb, dEb, Ob, _ = _nearest_by_parity(B, m)
+    Ec, dEc, Oc, _ = _nearest_by_parity(C, m)
+    Ed, dEd, Od, _ = _nearest_by_parity(D, m)
 
-    even = _mul(Ea, Ea) + _mul(Eb, Eb) + _mul(Ec, Ec) + _mul(Ed, Ed)
-    odd = _mul(Oa, Oa) + _mul(Ob, Ob) + _mul(Oc, Oc) + _mul(Od, Od)
-    if even < odd or (even == odd and Ea > Oa):
-        return Ea, Eb, Ec, Ed
+    two_m = m + m
+    even_sum = dEa + dEb + dEc + dEd
+    if even_sum < two_m or (even_sum == two_m and Ea < Oa):
+        return A - _mul(m, Ea), B - _mul(m, Eb), C - _mul(m, Ec), D - _mul(m, Ed)
 
-    return Oa, Ob, Oc, Od
+    return A - _mul(m, Oa), B - _mul(m, Ob), C - _mul(m, Oc), D - _mul(m, Od)
 
 
 def _uv_for_prime(p: int) -> tuple[int, int]:
@@ -621,11 +663,12 @@ class hurwitzint:
 
         Without a modulus, a negative exp only works for a unit, whose inverse is its conjugate.
 
-        With one, the result is the canonical residue of its class, like that of inv_mod: the one of least norm, with
-            ties going to the largest numerator tuple. So congruent values have the very same powers, and pow(x, 1, mod)
-            reduces x itself. A negative exp takes powers of self.inv_mod(mod), as Python's pow does for an int (so it
-            raises ValueError when there is no inverse). The modulus has to be an integer, as for inv_mod: a float is
-            truncated with int(), a hurwitzint has to be real, and 0 raises ZeroDivisionError.
+        With one, the result is what % leaves, like that of inv_mod: the canonical residue of its class, the one of
+            least norm with ties going to the largest numerator tuple. So pow(x, e, mod) == (x**e) % mod, as for an int,
+            and congruent values have the very same powers. A negative exp takes powers of self.inv_mod(mod), as
+            Python's pow does for an int (so it raises ValueError when there is no inverse). The modulus has to be an
+            integer, as for inv_mod: a float is truncated with int(), a hurwitzint has to be real, and 0 raises
+            ZeroDivisionError.
 
         Returns:
             hurwitzint: The power.
@@ -696,9 +739,13 @@ class hurwitzint:
 
         Because multiplication is non-commutative, this is a specific choice.
 
+        r is the remainder of least norm (at most half of abs(other)), and when several q leave that, the one with
+            the largest numerator tuple. So r only depends on self modulo the left multiples of other: x and
+            x + h*other leave the same remainder, and so do other and u*other for a unit u. For an integer other, that
+            makes self % other the residue that pow(self, e, other) and inv_mod give.
+
         Returns:
-            (q, r) where r has small norm (typically < abs(other)),
-                or NotImplemented if other is an unsupported type.
+            (q, r), or NotImplemented if other is an unsupported type.
 
         Raises:
             ZeroDivisionError: if other == 0
@@ -771,6 +818,10 @@ class hurwitzint:
 
         Defines quotient on the RIGHT:
             self = other * q + r
+
+        r is chosen like the remainder of divmod (least norm, then the largest numerator tuple), so it only depends on
+            self modulo the right multiples of other: x and x + other*h leave the same remainder, and so do other and
+            other*u for a unit u.
 
         Returns:
             (q, r)
@@ -1147,7 +1198,8 @@ class hurwitzint:
 
         This divides on the left (a = q*b + r) for a right gcd, or with right=True on the right (a = b*q + r)
             for a left gcd. The loop runs on plain int numerators (see _divmod_numerators), so the only
-            hurwitzint it builds is the answer.
+            hurwitzint it builds is the answer. Any remainder of least norm will do, so when several tie, it skips
+            the work of picking the one % would (canonical=False).
 
         Returns:
             hurwitzint: The gcd.
@@ -1168,7 +1220,7 @@ class hurwitzint:
         E, F, G, H = other._a, other._b, other._c, other._d
         while E or F or G or H:
             n = (_mul(E, E) + _mul(F, F) + _mul(G, G) + _mul(H, H)) >> 2
-            _, _, _, _, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right)
+            _, _, _, _, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right, canonical=False)
             A, B, C, D, E, F, G, H = E, F, G, H, Ra, Rb, Rc, Rd
 
         return self._make(A, B, C, D)
@@ -1208,7 +1260,7 @@ class hurwitzint:
         s1, t1 = (0, 0, 0, 0), (2, 0, 0, 0)
         while E or F or G or H:
             n = (_mul(E, E) + _mul(F, F) + _mul(G, G) + _mul(H, H)) >> 2
-            Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right)
+            Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(A, B, C, D, E, F, G, H, n, right=right, canonical=False)
             q = (Qa, Qb, Qc, Qd)
 
             A, B, C, D, E, F, G, H = E, F, G, H, Ra, Rb, Rc, Rd
@@ -1352,9 +1404,8 @@ class hurwitzint:
             on both sides. Otherwise x has none, since N(x)*N(y) == N(x*y) would have to be 1 modulo mod. So x is
             invertible modulo mod exactly when N(x) and mod are coprime, and then its inverse is unique modulo mod.
 
-        It comes back as the canonical residue of its class, like the result of pow(x, e, mod): the one of least norm,
-            with ties going to the largest numerator tuple. That is (y % mod) for any inverse y, except when y / mod
-            lies exactly between Hurwitz integers, where % breaks the tie its own way.
+        It comes back as y % mod for any inverse y, like the result of pow(x, e, mod): the canonical residue of its
+            class, the one of least norm with ties going to the largest numerator tuple.
 
         The modulus has to be an integer, since only an integer's multiples are the same on either side: a float is
             truncated with int() and a hurwitzint has to be real (or this raises ValueError). A modulus of 0 raises
