@@ -555,11 +555,16 @@ class hurwitzint:
             return NotImplemented
 
         e = int(exp)
+        base: hurwitzint = self
         if e < 0:
-            raise ValueError("Negative powers not supported")
+            # x**-n is (x**-1)**n, which is only a Hurwitz integer when x is a unit, whose inverse is its conjugate
+            if not self.is_unit:
+                raise ValueError("Negative powers not supported for non-units, whose inverses are not Hurwitz integers")
+
+            base = self.conjugate()
+            e = -e
 
         result = hurwitzint(1, 0, 0, 0)  # multiplicative identity
-        base: hurwitzint = self
         while e:
             if e & 1:
                 result *= base

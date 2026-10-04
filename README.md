@@ -300,6 +300,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `hurwitzint(a=0, b=0, c=0, d=0, *, half=False)`
 * `hurwitzint.conjugate()`
 * `~u` / `u.inverse()` → the inverse of a unit `u` (its conjugate), or `ValueError` for anything else
+* `x ** n` → a power, where a negative `n` only works for a unit
 * `abs(h)` → reduced norm `N(h)` (an `int`)
 * `divmod(a, b)` → left-quotient Euclidean division
 * `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division

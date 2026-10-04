@@ -618,9 +618,23 @@ class TestPow(HurwitzIntTests):
 
     def test_negative_powers_of_non_units_raise(self):
         """A non-unit has no inverse among the Hurwitz integers, so a negative power of one raises ValueError"""
-        for x in (hurwitzint(2), hurwitzint(1, 1, 0, 0), hurwitzint(3, 5, 7, 9, half=True)):
-            with pytest.raises(ValueError, match="Negative powers"):
-                pow(x, -1)
+        for x in (hurwitzint(0), hurwitzint(2), hurwitzint(1, 1, 0, 0), hurwitzint(3, 5, 7, 9, half=True)):
+            for e in (-1, -2, -1.5):
+                with pytest.raises(ValueError, match="Negative powers"):
+                    pow(x, e)
+
+    def test_negative_powers_of_units(self):
+        """A unit's negative powers are the powers of its inverse, so they multiply back to 1 with its positive ones"""
+        one = hurwitzint(1)
+        for unit in hurwitzint.UNITS:
+            for n in range(1, 13):
+                assert unit ** -n == (~unit) ** n
+                assert unit ** -n * unit ** n == unit ** n * unit ** -n == one
+
+        i = hurwitzint(0, 1, 0, 0)
+        assert i ** -1 == -i
+        assert i ** -2 == -1
+        assert pow(i, -1.9) == pow(i, -1)  # A float exponent is truncated with int(), toward 0
 
 
 class TestAlgebra(HurwitzIntTests):
@@ -1254,18 +1268,6 @@ class TestInverse(HurwitzIntTests):
         for n in (hurwitzint(0), hurwitzint(2), hurwitzint(1, 1, 0, 0), hurwitzint(3, 5, 7, 9, half=True)):
             with pytest.raises(ValueError, match="only Hurwitz units have inverses"):
                 operator.invert(n)
-
-    def test_negative_power_for_units_if_supported(self):
-        """Validate negative powers of units agree with inverse powers."""
-        i = hurwitzint(0, 1, 0, 0)
-
-        try:
-            res = i ** -1
-        except ValueError:
-            pytest.skip("Negative powers are not supported")
-        else:
-            assert res == i.inverse()
-            assert i ** -2 == i.inverse() * i.inverse()
 
 
 class TestSplitLipschitz(HurwitzIntTests):
