@@ -88,13 +88,17 @@ class NonCommutativeFactorization:
                 factorization) or 1 (which leaves nothing to expand).
 
         Raises:
-            TypeError: If factors has anything but ints in it.
+            TypeError: If factors is not a dict, or has anything but ints in it.
             ValueError: If factors has a negative exponent, does not multiply to content, or has a key that is not
                 prime.
         """
         m = self.content
         if factors is not None:
-            # The mypyc build rejects anything but ints before getting here, so this makes pure Python match it
+            # The mypyc build rejects anything but a dict of ints before getting here, so these make pure Python match
+            #   it (a dict subclass like Counter is fine in both)
+            if not isinstance(factors, dict):
+                raise TypeError(f"factors must be a dict, not {type(factors).__name__!r}")
+
             if not all(isinstance(p, int) and isinstance(e, int) for p, e in factors.items()):
                 raise TypeError("factors must map int primes to int exponents")
 

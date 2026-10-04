@@ -6,11 +6,13 @@ import os
 import pickle
 import random
 
+from collections import Counter
 from decimal import Decimal
 from fractions import Fraction
 from itertools import product, starmap
 from math import floor, gcd, isqrt
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -2701,6 +2703,13 @@ class TestExpandContent(HurwitzIntTests):
         for bad in ({17.0: 1, 31: 1}, {17: 1.0, 31: 1}):
             with pytest.raises(TypeError):
                 factors.expand_content(factors=bad)
+
+        # It has to be a dict too, in both builds, though a dict subclass like Counter is fine
+        for bad in (MappingProxyType({17: 1, 31: 1}), [(17, 1), (31, 1)], "17", 527):
+            with pytest.raises(TypeError):
+                factors.expand_content(factors=bad)
+
+        assert factors.expand_content(factors=Counter({17: 1, 31: 1})) == factors.expand_content()
 
         # A zero exponent changes nothing
         assert factors.expand_content(factors={2: 0, 17: 1, 31: 1}) == factors.expand_content()
