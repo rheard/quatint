@@ -651,6 +651,23 @@ class TestPow(HurwitzIntTests):
 
         assert pow(x, Other()) == "rpow"
 
+    def test_hurwitzint_exponents(self):
+        """
+        Nothing takes a hurwitzint as an exponent, a real one included, so whatever the base, ** and pow raise
+            TypeError in both builds (the compiled one used to recurse until RecursionError, see the TODO on __rpow__)
+        """
+        x = hurwitzint(1, 2, 3, 4)
+        for exp in (x, hurwitzint(2), hurwitzint(1, 1, 1, 1, half=True)):
+            for base in (x, hurwitzint(2), 2, 2.5, None, "a"):
+                with pytest.raises(TypeError):
+                    operator.pow(base, exp)
+
+                with pytest.raises(TypeError):
+                    pow(base, exp, 5)
+
+            with pytest.raises(TypeError):
+                operator.ipow(x, exp)
+
     def test_power_laws(self):
         """x**(m+n) == x**m * x**n and (x**m)**n == x**(m*n) for random x, and norms and conjugates follow along"""
         rng = random.Random(6_000)

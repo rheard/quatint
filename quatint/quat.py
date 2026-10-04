@@ -695,6 +695,14 @@ class hurwitzint:
 
         return result
 
+    # TODO: This only works around a mypyc bug, and can go once that is fixed. When its type check rejects an argument,
+    #   mypyc's compiled __pow__ calls the right operand's __rpow__ itself, and without this, a hurwitzint's is the
+    #   wrapper CPython adds for the slot __pow__ fills, which calls straight back. So x ** x, 2 ** x and None ** x
+    #   recursed until RecursionError, rather than raising TypeError. TestPow.test_hurwitzint_exponents checks them.
+    def __rpow__(self, other: object) -> object:
+        # Nothing takes a hurwitzint as an exponent. -> object, since mypyc would cast NotImplemented to a hurwitzint
+        return NotImplemented
+
     # region Euclidean division (Hurwitz order is norm-Euclidean)
     def _division(self,
                   divisor: hurwitzint,
