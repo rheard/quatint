@@ -1028,6 +1028,19 @@ class hurwitzint:
 
         return q
 
+    @property
+    def trace(self) -> int:
+        """
+        The trace, x + conj(x), which for (A+Bi+Cj+Dk)/2 is A: twice the real part.
+
+        Along with the norm abs(x), it gives the quadratic every Hurwitz integer is a root of:
+            x**2 - x.trace*x + abs(x) == 0. And though x*y and y*x usually differ, their traces never do.
+
+        Returns:
+            int: The trace.
+        """
+        return self._a
+
     def __bool__(self) -> bool:
         return (self._a | self._b | self._c | self._d) != 0
 

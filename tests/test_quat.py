@@ -790,6 +790,42 @@ class TestAlgebra(HurwitzIntTests):
             assert a + a.conjugate() == a.a
 
 
+class TestTrace(HurwitzIntTests):
+    """Tests for trace, x + conj(x) as an int"""
+
+    def test_examples(self):
+        """Some traces worked out by hand: twice the real part, which is a whole number for half-integers too"""
+        examples = (
+            (hurwitzint(1, 2, 3, 4), 2),
+            (hurwitzint(3, -5, 7, 9, half=True), 3),
+            (hurwitzint(-1, 1, 1, 1, half=True), -1),
+            (hurwitzint(0, 1, 0, 0), 0),
+            (hurwitzint(-7), -14),
+            (hurwitzint(0), 0),
+            (hurwitzint(10**30, -1, 0, 2), 2 * 10**30),
+        )
+        for x, expected in examples:
+            assert x.trace == expected
+            assert type(x.trace) is int
+            assert x + x.conjugate() == expected
+
+    def test_trace_and_norm_give_the_polynomial(self):
+        """
+        Every x is a root of x**2 - trace*x + norm, and traces add like the values do. The traces of x*y and y*x are the
+            same too, though x*y and y*x usually differ
+        """
+        rng = random.Random(19_000)
+        for bound in (3, 10**4, 10**30):
+            for _ in range(100):
+                x, y = self.rand_hurwitzint(rng, bound), self.rand_hurwitzint(rng, bound)
+
+                assert x * x - x.trace * x + abs(x) == 0
+                assert (x + y).trace == x.trace + y.trace
+                assert (5 * x).trace == 5 * x.trace
+                assert x.conjugate().trace == x.trace
+                assert (x * y).trace == (y * x).trace
+
+
 class TestDiv(HurwitzIntTests):
     """Tests for __truediv__ and __floordiv__"""
 

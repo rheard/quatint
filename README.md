@@ -17,7 +17,7 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
 - **Exact arithmetic** (no floats required for quaternion values)
 - **Hurwitz order representation** with parity enforcement
 - **Non-commutative multiplication**
-- **Reduced norm** $N(q) ∈ Z$ and quaternion conjugation
+- **Reduced norm** $N(q) ∈ Z$, **trace** (`q + q.conjugate()`), and quaternion conjugation
 - **Euclidean division** (norm-Euclidean) via:
   - `divmod(a, b)` for **left-quotient** division (`a = q*b + r`)
   - `a.rdivmod(b)` (or `quatint.rdivmod(a, b)`) for **right-quotient** division (`a = b*q + r`)
@@ -334,6 +334,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `x ** n` → a power, where a negative `n` only works for a unit
 * `pow(x, n, m)` → `x ** n` modulo the integer `m`, where a negative `n` takes powers of `x.inv_mod(m)`
 * `abs(h)` → reduced norm `N(h)` (an `int`)
+* `h.trace` → `h + h.conjugate()`, twice the real part (an `int`); every `h` is a root of `h**2 - h.trace*h + abs(h)`
 * `h.is_irreducible` → whether `h` is a Hurwitz prime, which is when its norm is a rational prime
 * `int(h)` / `float(h)` / `complex(h)` → the number a real `h` equals, or `TypeError` for anything else
 * `divmod(a, b)` → left-quotient Euclidean division
