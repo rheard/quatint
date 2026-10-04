@@ -596,17 +596,40 @@ class hurwitzint:
         return self.__mul__(other)
 
     # Not just `exp: float`, since mypyc would turn an int exponent into a double and lose every bit past 2**53
-    def __pow__(self, exp: OTHER_OP_TYPES) -> hurwitzint:
+    def __pow__(self, exp: OTHER_OP_TYPES, mod: OP_TYPES | None = None) -> hurwitzint:
+        """
+        Return self**exp, or for pow(self, exp, mod), self**exp modulo the integer mod.
+
+        Without a modulus, a negative exp only works for a unit, whose inverse is its conjugate.
+
+        With one, the result is the canonical residue of its class, like that of inv_mod: the one of least norm, with
+            ties going to the largest numerator tuple. So congruent values have the very same powers, and pow(x, 1, mod)
+            reduces x itself. A negative exp takes powers of self.inv_mod(mod), as Python's pow does for an int (so it
+            raises ValueError when there is no inverse). The modulus has to be an integer, as for inv_mod: a float is
+            truncated with int(), a hurwitzint has to be real, and 0 raises ZeroDivisionError.
+
+        Returns:
+            hurwitzint: The power.
+
+        Raises:
+            ValueError: If exp is negative without a modulus, and self is not a unit.
+        """
         # The mypyc build rejects anything else before getting here, so this makes pure Python match it
         if not _is_number(exp):
             return NotImplemented
 
         e = int(exp)
+        if mod is not None:
+            if not (isinstance(mod, hurwitzint) or _is_number(mod)):
+                return NotImplemented
+
+            return self._pow_mod(e, self._modulus(mod, "pow()"))
+
         base: hurwitzint = self
         if e < 0:
             # x**-n is (x**-1)**n, which is only a Hurwitz integer when x is a unit, whose inverse is its conjugate
             if not self.is_unit:
-                raise ValueError("Negative powers not supported for non-units, whose inverses are not Hurwitz integers")
+                raise ValueError("Negative powers of a non-unit need a modulus (its inverse isn't a Hurwitz integer)")
 
             base = self.conjugate()
             e = -e
@@ -1328,6 +1351,38 @@ class hurwitzint:
         k = pow(n, -1, m)
         Ca, Cb, Cc, Cd = _mul(self._a, k), -_mul(self._b, k), -_mul(self._c, k), -_mul(self._d, k)
         Ra, Rb, Rc, Rd = _residue_numerators(Ca, Cb, Cc, Cd, m)
+        return self._make(Ra, Rb, Rc, Rd)
+
+    def _pow_mod(self, e: int, m: int) -> hurwitzint:
+        """
+        Return self**e modulo m > 0, as its canonical residue, for pow(self, e, m). A negative e uses inv_mod.
+
+        m is an integer, so its multiples are a two-sided ideal, and the residues of a product only depend on those of
+            its factors. So this reduces after every product, which keeps the numbers small (as Python's pow does
+            for an int). It works on plain int numerators, like the division code, so it builds no hurwitzint until the
+            answer.
+
+        Returns:
+            hurwitzint: The power, reduced.
+        """
+        base = self.inv_mod(m) if e < 0 else self
+        if e < 0:
+            e = -e
+
+        Ra, Rb, Rc, Rd = _residue_numerators(2, 0, 0, 0, m)  # 1, which is 0 modulo 1
+        Ba, Bb, Bc, Bd = _residue_numerators(base._a, base._b, base._c, base._d, m)
+
+        # Exponentiation by squaring. Powers of one base commute, so the order of each product doesn't matter
+        while e:
+            if e & 1:
+                Pa, Pb, Pc, Pd = _mul_numerators(Ra, Rb, Rc, Rd, Ba, Bb, Bc, Bd)
+                Ra, Rb, Rc, Rd = _residue_numerators(Pa, Pb, Pc, Pd, m)
+
+            e >>= 1
+            if e:
+                Pa, Pb, Pc, Pd = _mul_numerators(Ba, Bb, Bc, Bd, Ba, Bb, Bc, Bd)
+                Ba, Bb, Bc, Bd = _residue_numerators(Pa, Pb, Pc, Pd, m)
+
         return self._make(Ra, Rb, Rc, Rd)
     # endregion
 

@@ -1977,6 +1977,104 @@ class TestInvMod(HurwitzIntTests):
                 x.inv_mod(mod)
 
 
+class TestPowMod(HurwitzIntTests):
+    """Tests for pow(x, e, mod), powers modulo an integer"""
+
+    def test_examples(self):
+        """Some powers worked out by hand"""
+        # i*i == -1, which has the least norm there is, so it is its own residue
+        assert pow(hurwitzint(0, 1, 0, 0), 2, 5) == -1
+
+        # 81 == 11*7 + 4, but -3 is the residue of least norm (Python's pow gives 4)
+        assert pow(hurwitzint(3), 4, 7) == -3
+
+        # (1+i)**2 == 2i, and 2i == -i (mod 3)
+        assert pow(hurwitzint(1, 1, 0, 0), 2, 3) == hurwitzint(0, -1, 0, 0)
+
+    def test_matches_reducing_the_power(self):
+        """pow(x, e, m) is the canonical residue of x**e itself, for random x, e and m"""
+        rng = random.Random(18_000)
+        for bound in (3, 10**4, 10**12):
+            for _ in range(40):
+                x = self.rand_hurwitzint(rng, bound)
+                e = rng.randint(0, 12)
+                m = rng.choice((1, 2, 3, 4, 6, 7, 10, 97, 10**9 + 7))
+                assert pow(x, e, m) == self.brute_residue(x**e, m)
+
+    def test_congruent_bases(self):
+        """Congruent bases have the very same powers, which (x**e) % m doesn't promise"""
+        rng = random.Random(18_001)
+        for _ in range(60):
+            x = self.rand_hurwitzint(rng, 10)
+            m = rng.choice((2, 3, 4, 6))
+            h = self.rand_hurwitzint(rng, 10)
+            for e in (0, 1, 2, 5):
+                assert pow(x + m * h, e, m) == pow(x, e, m)
+
+    def test_power_laws(self):
+        """Modular powers combine like powers do, for random values and exponents"""
+        rng = random.Random(18_002)
+        for _ in range(60):
+            x = self.rand_hurwitzint(rng, 10**6)
+            k = rng.choice((2, 3, 5, 12, 97, 10**9 + 7))
+            a, b = rng.randint(0, 50), rng.randint(0, 50)
+            assert pow(x, a + b, k) == pow(pow(x, a, k) * pow(x, b, k), 1, k)
+            assert pow(x, a * b, k) == pow(pow(x, a, k), b, k)
+
+    def test_huge_exponents(self):
+        """Every bit of a huge exponent counts, even past what a float holds (doubles round past 2**53)"""
+        x = hurwitzint(1, 2, 3, 4)  # Of norm 30, so invertible mod 97, so x**(e+1) == x**e would mean x == 1
+        for e in (2**64, 2**1100):
+            assert pow(x, e + 1, 97) == pow(pow(x, e, 97) * x, 1, 97)
+            assert pow(x, e + 1, 97) != pow(x, e, 97)
+
+    def test_exponent_zero(self):
+        """x**0 is 1, reduced: 1 itself for any modulus but 1, where everything is 0"""
+        for x in (hurwitzint(0), hurwitzint(1, 2, 3, 4), hurwitzint(3, -5, 7, 9, half=True)):
+            assert pow(x, 0, 1) == 0
+            for m in (2, 3, 97, -5):
+                assert pow(x, 0, m) == 1
+
+    def test_negative_exponents(self):
+        """A negative exponent takes powers of the inverse modulo m, so it needs one to exist"""
+        rng = random.Random(18_003)
+        for _ in range(60):
+            x = self.rand_hurwitzint(rng, 10**4)
+            m = rng.choice((3, 5, 7, 12, 97))
+            if gcd(abs(x), m) != 1:
+                with pytest.raises(ValueError, match="not invertible mod"):
+                    pow(x, -1, m)
+
+                continue
+
+            for e in (1, 2, 7):
+                assert pow(x, -e, m) == pow(x.inv_mod(m), e, m)
+                assert pow(pow(x, -e, m) * pow(x, e, m), 1, m) == 1
+
+    def test_moduli(self):
+        """A float modulus is truncated, and a negative one, or a real hurwitzint, works like the positive int"""
+        x = hurwitzint(3, -5, 7, 9, half=True)
+        expected = pow(x, 5, 7)
+        for mod in (7.0, 7.9, -7, hurwitzint(7), hurwitzint(-7)):
+            assert pow(x, 5, mod) == expected
+
+        assert pow(x, 5, None) == x**5  # As for an int, None is no modulus
+
+    def test_bad_moduli(self):
+        """A modulus of 0 raises ZeroDivisionError, a hurwitzint off the real axis ValueError, and the rest TypeError"""
+        x = hurwitzint(3, -5, 7, 9, half=True)
+        for zero in (0, 0.0, hurwitzint(0)):
+            with pytest.raises(ZeroDivisionError):
+                pow(x, 2, zero)
+
+        with pytest.raises(ValueError, match="integer modulus"):
+            pow(x, 2, hurwitzint(1, 1, 0, 0))
+
+        for mod in ("7", [7], complex(7, 0)):
+            with pytest.raises(TypeError):
+                pow(x, 2, mod)
+
+
 class TestContent(HurwitzIntTests):
     """Tests for content, the largest integer that divides a Hurwitz integer"""
 

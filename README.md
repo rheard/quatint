@@ -188,8 +188,19 @@ print(y)  # (-1+i+0j+0k)
 assert hurwitzint(3).divides_right(x * y - 1) and hurwitzint(3).divides_right(y * x - 1)
 ```
 
-The modulus has to be an integer (or a real `hurwitzint`), since only an integer's multiples are the same from either side.
-    The result is the canonical residue of its class: the element of least norm, with ties going to the largest numerator tuple, so congruent values always give the very same result.
+`pow(x, e, m)` is `x ** e` modulo an integer `m`, reducing as it goes, so a huge `e` is no problem.
+    A negative `e` takes powers of `x.inv_mod(m)`, as Python's `pow` does for an `int`:
+
+```python
+from quatint import hurwitzint
+
+x = hurwitzint(1, 2, 3, 4)
+assert pow(x, 10**18, 7) == pow(pow(x, 10**9, 7), 10**9, 7)
+assert pow(x, -1, 7) == x.inv_mod(7)
+```
+
+For both, the modulus has to be an integer (or a real `hurwitzint`), since only an integer's multiples are the same from either side.
+    The result is the canonical residue of its class: the element of least norm, with ties going to the largest numerator tuple, so congruent values always give the very same result, and `pow(x, 1, m)` reduces `x` itself.
     `x % m` is the Euclidean remainder, which can only differ from that when `x / m` lies exactly between Hurwitz integers, where `%` breaks the tie its own way.
 
 ### Primes of a given norm
@@ -319,6 +330,7 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `hurwitzint.conjugate()`
 * `~u` / `u.inverse()` → the inverse of a unit `u` (its conjugate), or `ValueError` for anything else
 * `x ** n` → a power, where a negative `n` only works for a unit
+* `pow(x, n, m)` → `x ** n` modulo the integer `m`, where a negative `n` takes powers of `x.inv_mod(m)`
 * `abs(h)` → reduced norm `N(h)` (an `int`)
 * `h.is_irreducible` → whether `h` is a Hurwitz prime, which is when its norm is a rational prime
 * `int(h)` / `float(h)` / `complex(h)` → the number a real `h` equals, or `TypeError` for anything else
