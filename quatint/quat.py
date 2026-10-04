@@ -662,7 +662,8 @@ class hurwitzint:
         return self._make(-self._a, -self._b, -self._c, -self._d)
 
     def __pos__(self) -> hurwitzint:
-        return self._make(self._a, self._b, self._c, self._d)
+        # A hurwitzint never changes, so +x can be x itself, as it is for an int
+        return self
 
     def __mul__(self, other: hurwitzint | int | float) -> hurwitzint:
         if isinstance(other, hurwitzint):

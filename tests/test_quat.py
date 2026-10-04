@@ -515,10 +515,11 @@ class TestNegPos(HurwitzIntTests):
         self.assert_equal(res, res_int)
 
     def test_pos(self):
-        """Test +hurwitzint"""
+        """Test +hurwitzint, which is the very same value, since a hurwitzint never changes (as for an int)"""
         res_int = +self.a_int
 
         self.assert_equal((2, 4, 6, 8), res_int)
+        assert res_int is self.a_int
 
 
 class TestMul(HurwitzIntTests):
