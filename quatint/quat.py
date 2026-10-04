@@ -1164,26 +1164,26 @@ class hurwitzint:
     # region Factoring
     def content(self) -> int:
         """
-        Largest positive integer m such that self = m*q' with q' still a Hurwitz integer.
-            Computed in numerator-units with the Hurwitz parity constraint.
+        Largest positive integer m such that self = m*q' with q' still a Hurwitz integer (0 for self = 0).
+
+        In numerator units, m has to divide all four numerators, leaving four of the same parity. So m divides their
+            gcd g, and g itself works unless the numerators over g come out of mixed parity. That only happens when all
+            four numerators are even (when they are all odd, so are they over g), and then g is even and g/2 works,
+            leaving four even numerators.
 
         Returns:
             int: Computed content value.
         """
         A, B, C, D = self._a, self._b, self._c, self._d
-        g = gcd(abs(A), abs(B), abs(C), abs(D))
-
+        g = gcd(A, B, C, D)  # Never negative, whatever the signs, and 0 only for self = 0
         if g == 0:
             return 0
 
-        # Adjust by powers of two until the reduced tuple is all same parity.
-        while g > 0:
-            a, b, c, d = A // g, B // g, C // g, D // g
-            if (((a ^ b) & 1) == 0) and (((a ^ c) & 1) == 0) and (((a ^ d) & 1) == 0):
-                return g
-            g //= 2
+        a, b, c, d = A // g, B // g, C // g, D // g
+        if ((a ^ b) & 1) or ((a ^ c) & 1) or ((a ^ d) & 1):
+            return g // 2
 
-        return 1  # practically unreachable for nonzero, but safe
+        return g
 
     def _canonical_associate(self, direction: Literal["left", "right"]) -> tuple[hurwitzint, hurwitzint]:
         """
