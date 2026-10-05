@@ -505,6 +505,14 @@ def _factorint(n: int) -> dict[int, int]:
     return {int(p): int(e) for p, e in factorint(n).items()}
 
 
+def _imag_term(coeff: int, sym: str) -> str:
+    """Return the term of hurwitzint.__repr__ for coeff and sym (i, j or k), like +2i, -j or +0k, leaving out a 1."""
+    sign = "+" if coeff >= 0 else "-"
+    mag = -coeff if coeff < 0 else coeff
+    mag_str = "" if mag == 1 else str(mag)  # 1i -> i
+    return f"{sign}{mag_str}{sym}"
+
+
 class hurwitzint:
     """
     Hurwitz quaternion integer.
@@ -1171,12 +1179,6 @@ class hurwitzint:
             if rd == -1:
                 return "-k"
             return f"{rd}k"
-
-        def _imag_term(coeff: int, sym: str) -> str:
-            sign = "+" if coeff >= 0 else "-"
-            mag = -coeff if coeff < 0 else coeff
-            mag_str = "" if mag == 1 else str(mag)  # 1i -> i
-            return f"{sign}{mag_str}{sym}"
 
         core = f"({ra}{_imag_term(rb, 'i')}{_imag_term(rc, 'j')}{_imag_term(rd, 'k')})"
         return f"{core}/{den}" if den is not None else core
