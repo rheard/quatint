@@ -71,6 +71,10 @@ test-command=[
 [tool.cibuildwheel.linux]
 environment-pass = ["CI", "GITHUB_ACTIONS"]
 
+[[tool.mypy.overrides]]
+module = "sympy.polys.numberfields.resolvent_lookup"
+follow_imports = "skip"
+
 [tool.ruff]
 line-length = 120
 extend-exclude=["quatint-stubs"]
