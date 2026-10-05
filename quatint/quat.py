@@ -831,12 +831,13 @@ class hurwitzint:
         return NotImplemented
 
     def __floordiv__(self, other: hurwitzint | int | float) -> hurwitzint:
-        # Not divmod(self, other), so an unsupported other gets its own __rfloordiv__ and a TypeError naming //
-        qr = self.__divmod__(other)
-        if qr is NotImplemented:
+        # Not divmod(self, other), so an unsupported other gets its own __rfloordiv__ and a TypeError naming //.
+        #   The type is checked first, rather than comparing what __divmod__ returns with NotImplemented, since mypyc
+        #   would box the (q, r) tuple for that on every call
+        if not (isinstance(other, hurwitzint) or _is_number(other)):
             return NotImplemented
 
-        return qr[0]
+        return self.__divmod__(other)[0]
 
     def __rfloordiv__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
@@ -845,11 +846,11 @@ class hurwitzint:
         return NotImplemented
 
     def __mod__(self, other: hurwitzint | int | float) -> hurwitzint:
-        qr = self.__divmod__(other)
-        if qr is NotImplemented:
+        # The type first, as in __floordiv__
+        if not (isinstance(other, hurwitzint) or _is_number(other)):
             return NotImplemented
 
-        return qr[1]
+        return self.__divmod__(other)[1]
 
     def __rmod__(self, other: int | float) -> hurwitzint:
         if _is_number(other):
