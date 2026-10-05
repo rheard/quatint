@@ -2,7 +2,7 @@
 
 Exact (integer-backed) quaternion arithmetic for the **Hurwitz integers**.
 
-`quatint` provides a fast, mypyc-friendly `hurwitzint` type that behaves like a small, practical numeric object: addition/subtraction/multiplication/power, norms and conjugation, plus **left/right Euclidean division**, **left/right gcd**, and **deterministic factorization** utilities.
+`quatint` provides a fast, mypyc-friendly `hurwitzint` type that behaves like a small, practical numeric object: addition/subtraction/multiplication/power, norms and conjugation, plus **left/right Euclidean division**, **left/right gcd**, **modular inverses and powers**, and **deterministic factorization** utilities.
 
 ## Why this exists
 
@@ -25,9 +25,12 @@ Python’s built-in numeric types don’t provide an exact, integer-backed quate
   and **divisibility** tests (`divides_right`, `divides_left`)
 - **Left/right gcd** (`gcd_left`, `gcd_right`) built on the corresponding division,
   and **extended gcd** (`xgcd_left`, `xgcd_right`) with Bézout coefficients
+- **Modular arithmetic** modulo an integer: inverses (`inv_mod`) and powers (`pow(x, e, m)`)
+- **Hurwitz primes**: an irreducibility test (`is_irreducible`), and a fixed prime of any prime norm (`prime_of_norm`)
 - **Deterministic factorization** into `content`, `unit`, and Hurwitz primes (by prime norms)
+- **Immutable values** that hash, pickle and copy like an `int`
 
-New helper methods on every Hurwitz integer value:
+Factorization helpers on every Hurwitz integer value:
 
 * `x.content()` — largest positive integer `n` such that `x = n*y` for another Hurwitz integer `y`.
 * `x.factor_right()` — a plain ordered tuple of Hurwitz primes whose product via `prod_right(...)` is exactly `x`.
@@ -39,9 +42,10 @@ New helper methods on every Hurwitz integer value:
 
 ```bash
 python -m pip install quatint
-````
+```
 
-This project is designed to compile cleanly with **mypyc** for speed (CI/test setups often ensure the compiled artifact is what’s running).
+The wheels on PyPI are compiled with **mypyc** for speed. They cover CPython 3.10 to 3.14 on Windows, macOS and Linux, and include type stubs.
+    There is no source distribution, so those are the platforms it installs on.
 
 ## Quick start
 
@@ -84,6 +88,9 @@ assert q * b + r == a
 The remainder is the one of least norm (at most half of `abs(b)`), and when several quotients leave that, the one with the largest numerator tuple.
     So it only depends on `a` modulo the multiples of `b`: `a % b == (a + h * b) % b` for any Hurwitz integer `h`.
 
+`a // b` and `a % b` are the quotient and remainder on their own.
+    `a / b` is the same as `a // b`, since the quotient has to be a Hurwitz integer too.
+
 ### Right-division (right-quotient)
 
 Use `rdivmod` (method or helper) to define quotient on the **right**:
@@ -97,6 +104,8 @@ b = hurwitzint(1, 2, 3, 4)
 q, r = rdivmod(a, b)
 assert b * q + r == a
 ```
+
+The remainder is chosen the same way as for `divmod`, and `a.rfloordiv(b)`, `a.rmod(b)` and `a.rtruediv(b)` are the right-division versions of `//`, `%` and `/`.
 
 ### Exact division and divisibility
 
@@ -229,8 +238,8 @@ By default the prime is canonical up to a unit on its left, like the primes of `
 * `factor_right()` / `factor_left()` return a simple ordered tuple of Hurwitz primes.
 * `factor_right_detail()` / `factor_left_detail()` return a structured `NonCommutativeFactorization` with metadata.
 
-Use the plain methods when you just want primes that multiply back to the original value. 
-  Use the detailed methods when you care about the separated integer content, unit, normalized prime factors, or canonical ordering.
+Use the plain methods when you just want primes that multiply back to the original value.
+    Use the detailed methods when you care about the separated integer content, unit, normalized prime factors, or canonical ordering.
 
 ### Plain factorization
 
@@ -269,6 +278,7 @@ The detailed methods return a compact normal form, in a class called `NonCommuta
 * `content`: maximal positive integer scalar dividing the element (in the Hurwitz sense), or 1 after `expand_content()`
 * `unit`: a norm-1 Hurwitz unit (deterministically chosen)
 * `primes`: Hurwitz primes (each with prime rational norm), normalized via unit migration
+* `direction`: `"right"` or `"left"`, the side the primes were divided off, which is how `prod()` multiplies them back
 
 `NonCommutativeFactorization` also exposes some utility methods for convenience, such as:
 
@@ -317,19 +327,32 @@ This means:
 * Lipschitz integers are stored with **even** numerators.
 * True Hurwitz half-integers are stored with **odd** numerators.
 * The constructor enforces the parity constraint.
+* `x.a`, `x.b`, `x.c` and `x.d` are these numerators, and so are `list(x)` and `x[0]` to `x[3]`.
+    So `hurwitzint(1, 2, 3, 4).a == 2`, and `hurwitzint(*x, half=True) == x`.
+* `x.is_lipschitz` says whether they are all even, and `x.split_lipschitz()` splits a half-integer into a Lipschitz integer plus one of the 16 half units `(±1±i±j±k)/2`.
 
 ### Scalar coercions
 
 `int` and `float` inputs are accepted as scalars and converted via `int(...)` (i.e., truncation semantics), both as operands and as the components (and exponents) given to `hurwitzint(...)` and `**`. Quaternion values themselves remain exact.
+    Any other type there, like a `complex`, `Fraction`, `Decimal` or `str`, raises `TypeError`.
 
 That includes either argument of the module-level `rdivmod`, `gcd_left`, `gcd_right`, `xgcd_left` and `xgcd_right`, so `gcd_right(12, b)` is `hurwitzint(12).gcd_right(b)`.
 
 Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2) == 2.0` are `True`, but `hurwitzint(2) == 2.5` is `False`. A value that equals a Python number also hashes like it, so `hurwitzint(2)` and `2` are the same dict key (as `2` and `2.0` are).
 
+### Immutability, pickling and copying
+
+A `hurwitzint` never changes once it is made (`a`, `b`, `c` and `d` are read-only), so it is safe to hash, and to use in sets and as a dict key.
+    A `NonCommutativeFactorization` is frozen too.
+    Both pickle at every protocol, so they work with `multiprocessing`, and `copy.copy` and `copy.deepcopy` give back the value itself, as they do for an `int`.
+
 ## Public API (high level)
 
 * `hurwitzint(a=0, b=0, c=0, d=0, *, half=False)`
+* `h.a`, `h.b`, `h.c`, `h.d` / `list(h)` / `h[0]` to `h[3]` → the numerators over 2, so `hurwitzint(1, 2, 3, 4).a == 2`
+* `h.is_lipschitz` → whether every part is whole; `h.split_lipschitz()` → `(whole, half_unit)` with `h == whole + half_unit` (`half_unit` is `None` for a Lipschitz `h`)
 * `hurwitzint.conjugate()`
+* `hurwitzint.UNITS` → the 24 units; `h.is_unit` → whether `h` is one of them
 * `~u` / `u.inverse()` → the inverse of a unit `u` (its conjugate), or `ValueError` for anything else
 * `x ** n` → a power, where a negative `n` only works for a unit
 * `pow(x, n, m)` → `x ** n` modulo the integer `m`, where a negative `n` takes powers of `x.inv_mod(m)`
@@ -337,8 +360,8 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `h.trace` → `h + h.conjugate()`, twice the real part (an `int`); every `h` is a root of `h**2 - h.trace*h + abs(h)`
 * `h.is_irreducible` → whether `h` is a Hurwitz prime, which is when its norm is a rational prime
 * `int(h)` / `float(h)` / `complex(h)` → the number a real `h` equals, or `TypeError` for anything else
-* `divmod(a, b)` → left-quotient Euclidean division
-* `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division
+* `divmod(a, b)` → left-quotient Euclidean division, with `a // b` and `a % b` its quotient and remainder (`a / b` is the same as `a // b`)
+* `a.rdivmod(b)` / `rdivmod(a, b)` → right-quotient Euclidean division, with `a.rfloordiv(b)` and `a.rmod(b)` its quotient and remainder (`a.rtruediv(b)` is the same as `a.rfloordiv(b)`)
 * `a.exact_div_right(b)` / `a.exact_div_left(b)` → the `q` with `a == q*b` / `a == b*q`, or `None` if there is none
 * `b.divides_right(a)` / `b.divides_left(a)` → whether `a == q*b` / `a == b*q` for some `q`
 * `a.gcd_left(b)` / `gcd_left(a, b)`
@@ -347,6 +370,9 @@ Equality is the exception, and is exact: `hurwitzint(2) == 2` and `hurwitzint(2)
 * `a.xgcd_right(b)` / `xgcd_right(a, b)` → `(g, s, t)` with `s*a + t*b == g`
 * `a.inv_mod(m)` → the inverse of `a` modulo the integer `m`, on both sides
 * `hurwitzint.prime_of_norm(p, *, direction="right")` → a fixed Hurwitz prime of norm `p`
+* `a.content()` → the largest positive integer dividing `a` (0 for `a = 0`)
+* `a.factor_right()` / `a.factor_left()` → a tuple of Hurwitz primes, whose product by `prod_right` / `prod_left` is `a`
 * `a.factor_left_detail()` / `a.factor_right_detail()` → `NonCommutativeFactorization`
 * `NonCommutativeFactorization.prod_left()` / `.prod_right()` / `.prod()`
 * `NonCommutativeFactorization.expand_content(factors=None)` → the same factorization, with the content factored into Hurwitz primes too
+* `prod_right(factors, start=None)` / `prod_left(factors, start=None)` → the product, taking each factor on the right (`a * b * c`) or on the left (`c * b * a`)
