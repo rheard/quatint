@@ -89,7 +89,7 @@ extend-select = [
     "D",      # lint.pydocstyle
     "multi-line-summary-second-line",   # Require multi-line docstring summary should start on second line, which is not Google convention
     "E", "W", # pycodestyle
-    # "ERA",    # eradicate    TODO: I'd like to enable this. Problem is, see the wishful thinking tests in test_basic
+    "ERA",    # eradicate
     "F",      # Pyflakes
     "FBT",    # flake8-boolean-trap
     "FLY",    # flynt

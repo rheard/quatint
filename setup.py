@@ -4,8 +4,7 @@ from setuptools import setup
 setup(
     name="quatint",
 
-    # mypyc docs say to just set packages simply like this:
-    #   packages=['quatint'],
+    # mypyc docs say to just set packages to ['quatint'].
     #
     # However: When I do that, quatint/__init__.py *itself* is included in the wheel which we don't want,
     #   because then the python version will be used instead of the mypyc-compiled pyd version.
