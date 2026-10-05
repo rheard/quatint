@@ -322,6 +322,19 @@ class TestPickle(HurwitzIntTests):
                 assert y == x
                 assert hash(y) == hash(x)
 
+    def test_hurwitzint_copies_are_itself(self):
+        """A hurwitzint never changes, so copy and deepcopy give back the very same object, as they do for an int"""
+        for x in (hurwitzint(1, 2, 3, 4), hurwitzint(3, -5, 7, 9, half=True), hurwitzint(0)):
+            assert copy.copy(x) is x
+            assert copy.deepcopy(x) is x
+
+            # deepcopy still copies a container around one, but not the hurwitzint inside
+            outer = [x, {x: x}]
+            copied = copy.deepcopy(outer)
+            assert copied is not outer
+            assert copied[0] is x
+            assert copied[1][x] is x
+
     def test_factorization(self):
         """A factorization comes back equal (content, unit, primes and direction), from every protocol and copy"""
         n = 30 * hurwitzint(3, 5, 7, 9, half=True)

@@ -1161,6 +1161,14 @@ class hurwitzint:
         # Every pickle names hurwitzint._make, so renaming it after a release would break the pickles saved before
         return hurwitzint._make, (self._a, self._b, self._c, self._d)
 
+    def __copy__(self) -> hurwitzint:
+        # A hurwitzint never changes, so its copy can be itself, as for an int or a Fraction (and like +x)
+        return self
+
+    def __deepcopy__(self, _memo: object) -> hurwitzint:
+        # Its parts are ints, which never change either
+        return self
+
     def __repr__(self) -> str:
         if self.is_lipschitz:
             # If all even, show integer components without "/2".
