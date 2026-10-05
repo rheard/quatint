@@ -347,6 +347,13 @@ class TestPickle(HurwitzIntTests):
                 assert hash(copied) == hash(factors)
                 assert copied.prod() == value
 
+    def test_factorization_copies_are_itself(self):
+        """A factorization and everything in it never change, so copy and deepcopy give back the very same object"""
+        n = 30 * hurwitzint(3, 5, 7, 9, half=True)
+        for factors in (n.factor_right_detail(), n.factor_left_detail().expand_content()):
+            assert copy.copy(factors) is factors
+            assert copy.deepcopy(factors) is factors
+
 
 class TestConversions(HurwitzIntTests):
     """Tests for int(), float(), complex() and __index__ of a hurwitzint"""

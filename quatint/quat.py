@@ -147,6 +147,14 @@ class NonCommutativeFactorization:
         # mypyc's default pickling would set the fields one at a time, which a frozen dataclass refuses
         return NonCommutativeFactorization, (self.content, self.unit, self.primes, self.direction)
 
+    def __copy__(self) -> NonCommutativeFactorization:
+        # Frozen, and so are its fields (an int, hurwitzints, a tuple and a str), so its copy can be itself
+        return self
+
+    def __deepcopy__(self, _memo: object) -> NonCommutativeFactorization:
+        # Likewise, since nothing in it can change
+        return self
+
     def prod(self) -> hurwitzint:
         """Recreate the number using prod_right or prod_left"""
         if self.direction == "right":
