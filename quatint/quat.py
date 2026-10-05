@@ -403,10 +403,11 @@ def _residue_numerators(A: int, B: int, C: int, D: int, m: int) -> tuple[int, in
     Returns:
         tuple: The remainder's numerators, over 2.
     """
-    Ea, dEa, Oa, _ = _nearest_by_parity(A, m)
-    Eb, dEb, Ob, _ = _nearest_by_parity(B, m)
-    Ec, dEc, Oc, _ = _nearest_by_parity(C, m)
-    Ed, dEd, Od, _ = _nearest_by_parity(D, m)
+    # The odd distances go unused, but not into _, which mypyc boxes (an allocation each, for distances past 256)
+    Ea, dEa, Oa, _dOa = _nearest_by_parity(A, m)
+    Eb, dEb, Ob, _dOb = _nearest_by_parity(B, m)
+    Ec, dEc, Oc, _dOc = _nearest_by_parity(C, m)
+    Ed, dEd, Od, _dOd = _nearest_by_parity(D, m)
 
     two_m = m + m
     even_sum = dEa + dEb + dEc + dEd
