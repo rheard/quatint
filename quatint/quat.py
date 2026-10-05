@@ -704,7 +704,7 @@ class hurwitzint:
         if not _is_number(exp):
             return NotImplemented
 
-        e = int(exp)
+        e = exp if type(exp) is int else int(exp)
         if mod is not None:
             if not (isinstance(mod, hurwitzint) or _is_number(mod)):
                 return NotImplemented
