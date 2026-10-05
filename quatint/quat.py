@@ -734,28 +734,28 @@ class hurwitzint:
     # region Euclidean division (Hurwitz order is norm-Euclidean)
     def _division(self,
                   divisor: hurwitzint,
-                  divisor_norm: int,
                   *,
                   right: bool = False) -> tuple[hurwitzint, hurwitzint]:
         """
         The division shared by __divmod__ and rdivmod: the nearest-lattice division of _divmod_numerators.
 
-        A real divisor takes the shortcut of _integer_division instead.
+        A real divisor takes the shortcut of _integer_division instead, which is also where a divisor of 0 raises
+            ZeroDivisionError.
 
         Args:
             divisor: The divisor.
-            divisor_norm: The divisor norm. Should be checked for 0 already!
             right: Divide on the right (self = divisor*q + r), rather than on the left (self = q*divisor + r).
 
         Returns:
             tuple: The quotient and remainder.
         """
-        if not (divisor._b or divisor._c or divisor._d):
-            return self._integer_division(divisor._a // 2)
+        E, F, G, H = divisor._a, divisor._b, divisor._c, divisor._d
+        if not (F or G or H):
+            return self._integer_division(E // 2)
 
-        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(self._a, self._b, self._c, self._d,
-                                                            divisor._a, divisor._b, divisor._c, divisor._d,
-                                                            divisor_norm, right=right)
+        # Off the real axis, the norm is never 0
+        Qa, Qb, Qc, Qd, Ra, Rb, Rc, Rd = _divmod_numerators(self._a, self._b, self._c, self._d, E, F, G, H,
+                                                            abs(divisor), right=right)
         return self._make(Qa, Qb, Qc, Qd), self._make(Ra, Rb, Rc, Rd)
 
     def _integer_division(self, m: int) -> tuple[hurwitzint, hurwitzint]:
@@ -794,11 +794,10 @@ class hurwitzint:
             x + h*other leave the same remainder, and so do other and u*other for a unit u. For an integer other, that
             makes self % other the residue that pow(self, e, other) and inv_mod give.
 
+        Dividing by 0 raises ZeroDivisionError.
+
         Returns:
             (q, r), or NotImplemented if other is an unsupported type.
-
-        Raises:
-            ZeroDivisionError: if other == 0
         """
         if _is_number(other):
             # A number divides each part on its own, without becoming a hurwitzint (see _integer_division)
@@ -807,12 +806,8 @@ class hurwitzint:
         if not isinstance(other, hurwitzint):
             return NotImplemented
 
-        n = abs(other)
-        if n == 0:
-            raise ZeroDivisionError
-
         # q ~ self * conj(other) / N(other), the usual quaternion self / other (see _division)
-        return self._division(other, n)
+        return self._division(other)
 
     def __rdivmod__(self, other: int | float) -> tuple[hurwitzint, hurwitzint]:
         if _is_number(other):
@@ -871,12 +866,13 @@ class hurwitzint:
             self modulo the right multiples of other: x and x + other*h leave the same remainder, and so do other and
             other*u for a unit u.
 
+        Dividing by 0 raises ZeroDivisionError.
+
         Returns:
             (q, r)
 
         Raises:
             TypeError: If other is an unsupported type.
-            ZeroDivisionError: If trying to divide by 0.
         """
         if _is_number(other):
             # An integer leaves the same quotient and remainder on either side (see _integer_division)
@@ -885,12 +881,8 @@ class hurwitzint:
         if not isinstance(other, hurwitzint):
             raise TypeError(f"unsupported type for rdivmod: {type(other).__name__!r}")
 
-        n = abs(other)
-        if n == 0:
-            raise ZeroDivisionError
-
         # Right quotient: q ~ other^{-1} * self = conj(other) * self / N(other) (see _division)
-        return self._division(other, n, right=True)
+        return self._division(other, right=True)
 
     def rtruediv(self, other: hurwitzint | int | float) -> hurwitzint:
         """A version of __truediv__ for right-division"""
