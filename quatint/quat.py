@@ -1223,14 +1223,12 @@ class hurwitzint:
         if self.is_lipschitz:
             return self, None
 
-        def sgn(n: int) -> int:
-            return 1 if n > 0 else -1
-
+        # Each numerator is odd, so never 0, and the half unit takes its sign
         half_unit = self._make(
-            sgn(self._a),
-            sgn(self._b),
-            sgn(self._c),
-            sgn(self._d),
+            1 if self._a > 0 else -1,
+            1 if self._b > 0 else -1,
+            1 if self._c > 0 else -1,
+            1 if self._d > 0 else -1,
         )
         whole = self - half_unit
 
